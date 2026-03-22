@@ -52,7 +52,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
 
   const events = (data ?? [])
-    .map((row: { events: Event | null }) => row.events)
+    .map((row: { events: unknown }) => row.events as Event | null)
     .filter((e): e is Event => e != null);
 
   res.json({ data: events, error: null });
