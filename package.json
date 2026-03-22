@@ -1,0 +1,23 @@
+{
+  "name": "hangout",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "mobile": "yarn workspace @hangout/mobile start",
+    "api": "yarn workspace @hangout/api dev",
+    "build:api": "yarn workspace @hangout/api build",
+    "typecheck": "yarn workspaces run typecheck",
+    "lint": "yarn workspaces run lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "packageManager": "yarn@4.2.2",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
