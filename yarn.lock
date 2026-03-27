@@ -1809,6 +1809,7 @@ __metadata:
     expo-secure-store: "npm:~15.0.8"
     expo-splash-screen: "npm:~31.0.13"
     expo-status-bar: "npm:~3.0.9"
+    expo-web-browser: "npm:^55.0.10"
     nativewind: "npm:^4.0.36"
     react: "npm:19.1.0"
     react-dom: "npm:19.1.0"
@@ -5481,6 +5482,16 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: 10c0/b35ed996a3da45a657075447bbf687dad4e7d5321129182e58737ea0fa4aeb8bb145bbe20967abd6823587a738e4c6fd62c41d18d8c11094ff926e2079c02fc2
+  languageName: node
+  linkType: hard
+
+"expo-web-browser@npm:^55.0.10":
+  version: 55.0.10
+  resolution: "expo-web-browser@npm:55.0.10"
+  peerDependencies:
+    expo: "*"
+    react-native: "*"
+  checksum: 10c0/add0775876217761f01fe1be3f83e4a11a0e06f2b68896074c3d9661e53167c5b3cacdbcb25b245272e1ef8b129021cef9a49765c022e6399c261a3412ca4af5
   languageName: node
   linkType: hard
 
