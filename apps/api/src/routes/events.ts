@@ -18,7 +18,7 @@ const supabase = createClient(
 const createEventSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().optional(),
-  event_date: z.string().datetime({ offset: true }).optional(),
+  event_date: z.string().optional().nullable(),
   location: z.string().max(300).optional(),
   hero_color: z.enum(['coral', 'violet', 'mint', 'golden', 'charcoal']).optional().default('coral'),
   // Present when creating from AI-parsed data

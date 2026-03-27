@@ -10,7 +10,7 @@ const SYSTEM_PROMPT = `You are an event planning assistant. Parse the user's eve
 Return ONLY valid JSON in this exact format:
 {
   "eventName": "string (inferred event name)",
-  "suggestedDate": "string or null",
+  "suggestedDate": "ISO 8601 date string (e.g. '2025-03-29') or null if date is unclear",
   "estimatedGuests": number or null,
   "categories": [
     {

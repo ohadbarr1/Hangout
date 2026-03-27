@@ -64,7 +64,10 @@ export const apiClient = {
     request('POST', '/events', {
       title: parsed.eventName,
       description,
-      event_date: parsed.suggestedDate,
+      // Only send event_date if it looks like a real date (ISO 8601)
+      ...(parsed.suggestedDate && /^\d{4}-\d{2}-\d{2}/.test(parsed.suggestedDate)
+        ? { event_date: parsed.suggestedDate }
+        : {}),
       parsed_categories: parsed.categories,
       estimated_guests: parsed.estimatedGuests,
     }),
