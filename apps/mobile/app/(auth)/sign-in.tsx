@@ -41,19 +41,46 @@ export default function SignInScreen() {
     try {
       if (mode === 'sign-in') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          if (error.message.toLowerCase().includes('email not confirmed')) {
+            Alert.alert(
+              'Email not confirmed',
+              'Please check your inbox and click the confirmation link before signing in.',
+              [
+                {
+                  text: 'Resend email',
+                  onPress: async () => {
+                    await supabase.auth.resend({ type: 'signup', email });
+                    Alert.alert('Sent!', 'Check your inbox for a new confirmation link.');
+                  },
+                },
+                { text: 'OK', style: 'cancel' },
+              ],
+            );
+          } else if (error.message.toLowerCase().includes('invalid login credentials')) {
+            Alert.alert('Incorrect credentials', 'Email or password is wrong. Try again.');
+          } else {
+            throw error;
+          }
+          return;
+        }
         router.replace('/(tabs)/');
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: name } },
         });
         if (error) throw error;
-        Alert.alert(
-          'Check your email',
-          'We sent you a confirmation link. Click it to activate your account.',
-        );
+        // If session returned immediately, email confirmation is disabled — go straight in
+        if (data.session) {
+          router.replace('/(tabs)/');
+        } else {
+          Alert.alert(
+            'Check your email',
+            `We sent a confirmation link to ${email}. Click it to activate your account, then come back to sign in.`,
+          );
+        }
       }
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Something went wrong.');

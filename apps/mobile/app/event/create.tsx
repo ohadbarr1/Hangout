@@ -8,9 +8,10 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -200,24 +201,56 @@ export default function CreateEventScreen() {
   );
 }
 
+const LOADING_MESSAGES = [
+  'Reading your event details...',
+  'Figuring out what to bring...',
+  'Building your item list...',
+  'Almost ready...',
+];
+
 function LoadingState() {
+  const [messageIndex, setMessageIndex] = useState(0);
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const cycle = () => {
+      // Fade out
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+        // Fade in
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
+    };
+
+    const interval = setInterval(cycle, 1800);
+    return () => clearInterval(interval);
+  }, [opacity]);
+
   return (
     <View className="flex-1 items-center justify-center px-8">
       <View className="mb-8">
         <ActivityIndicator color="#FF6B4A" size="large" />
       </View>
       <Text
-        className="text-charcoal text-xl text-center mb-3"
+        className="text-charcoal text-xl text-center mb-4"
         style={{ fontFamily: 'PlusJakartaSans-Bold' }}
       >
         Planning your event...
       </Text>
-      <Text
+      <Animated.Text
         className="text-charcoal/50 text-base text-center leading-6"
-        style={{ fontFamily: 'Inter-Regular' }}
+        style={{ fontFamily: 'Inter-Regular', opacity }}
       >
-        AI is figuring out everything you'll need.
-      </Text>
+        {LOADING_MESSAGES[messageIndex]}
+      </Animated.Text>
 
       {/* Skeleton cards */}
       <View className="w-full mt-10 gap-3">

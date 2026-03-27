@@ -4,12 +4,60 @@ import { supabase } from '@/lib/supabase';
 import { apiClient } from '@/lib/claude';
 import type { Event, EventMember } from '@hangout/shared';
 
+// ─── Augmented event type that includes item progress counts ──────────────────
+
+export interface EventWithCounts extends Event {
+  claimedCount: number;
+  totalItems: number;
+}
+
 // ─── Fetch all events for the current user ────────────────────────────────────
 
 export function useMyEvents() {
   return useQuery<Event[]>({
     queryKey: ['events'],
     queryFn: () => apiClient.getMyEvents(),
+    staleTime: 30_000,
+  });
+}
+
+// ─── Fetch events with item progress counts (for EventCard progress bars) ─────
+
+export function useMyEventsWithCounts() {
+  return useQuery<EventWithCounts[]>({
+    queryKey: ['events-with-counts'],
+    queryFn: async () => {
+      // Fetch events from API (handles auth + membership filtering)
+      const events = await apiClient.getMyEvents();
+      if (events.length === 0) return [];
+
+      const eventIds = events.map((e) => e.id);
+
+      // Fetch all items for these events in one Supabase query
+      const { data: items } = await supabase
+        .from('items')
+        .select('id, event_id, assignments(id)')
+        .in('event_id', eventIds);
+
+      // Build a per-event count map
+      const countMap: Record<string, { total: number; claimed: number }> = {};
+      for (const item of items ?? []) {
+        if (!countMap[item.event_id]) {
+          countMap[item.event_id] = { total: 0, claimed: 0 };
+        }
+        countMap[item.event_id].total += 1;
+        const assignmentsArr = Array.isArray(item.assignments) ? item.assignments : [];
+        if (assignmentsArr.length > 0) {
+          countMap[item.event_id].claimed += 1;
+        }
+      }
+
+      return events.map((event) => ({
+        ...event,
+        totalItems: countMap[event.id]?.total ?? 0,
+        claimedCount: countMap[event.id]?.claimed ?? 0,
+      }));
+    },
     staleTime: 30_000,
   });
 }

@@ -11,13 +11,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuthStore } from '@/stores/authStore';
-import { useMyEvents } from '@/hooks/useEvent';
+import { useMyEventsWithCounts } from '@/hooks/useEvent';
 import { EventCard } from '@/components/EventCard';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const { data: events, isLoading, isRefetching, refetch } = useMyEvents();
+  const { data: events, isLoading, isRefetching, refetch } = useMyEventsWithCounts();
 
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
@@ -101,6 +101,8 @@ export default function HomeScreen() {
                       key={event.id}
                       event={event}
                       onPress={() => router.push(`/event/${event.id}`)}
+                      claimedCount={event.claimedCount}
+                      totalItems={event.totalItems}
                     />
                   ))}
                 </View>
@@ -122,6 +124,8 @@ export default function HomeScreen() {
                       event={event}
                       onPress={() => router.push(`/event/${event.id}`)}
                       muted
+                      claimedCount={event.claimedCount}
+                      totalItems={event.totalItems}
                     />
                   ))}
                 </View>

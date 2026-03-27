@@ -11,8 +11,13 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 import { supabase } from '@/lib/supabase';
+
+// Required for expo-web-browser OAuth on native
+WebBrowser.maybeCompleteAuthSession();
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
@@ -21,13 +26,35 @@ export default function WelcomeScreen() {
   const signInWith = async (provider: 'google' | 'apple') => {
     setLoadingProvider(provider);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      // On web: redirect back to the same origin so detectSessionInUrl picks up the tokens.
+      // On native: use the deep-link scheme so Expo Router routes to /(auth)/callback.
+      const redirectTo =
+        Platform.OS === 'web'
+          ? (typeof window !== 'undefined' ? window.location.origin : 'https://dist-sable-pi.vercel.app') + '/'
+          : Linking.createURL('auth/callback');
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: 'hangout://auth/callback',
+          redirectTo,
+          skipBrowserRedirect: Platform.OS !== 'web', // let expo-web-browser handle it on native
         },
       });
       if (error) throw error;
+
+      // Native: open the OAuth URL in an in-app browser
+      if (Platform.OS !== 'web' && data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        if (result.type === 'success' && result.url) {
+          const parsed = Linking.parse(result.url);
+          const accessToken = parsed.queryParams?.access_token as string | undefined;
+          const refreshToken = parsed.queryParams?.refresh_token as string | undefined;
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+            router.replace('/(tabs)/');
+          }
+        }
+      }
     } catch (err) {
       Alert.alert('Sign in failed', err instanceof Error ? err.message : 'Unknown error');
     } finally {

@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiClient } from '@/lib/claude';
 import { useAuthStore } from '@/stores/authStore';
+import { RsvpStatus } from '@hangout/shared';
 import type { Invite } from '@hangout/shared';
 
 type InviteState = 'loading' | 'preview' | 'joining' | 'error';
@@ -51,7 +52,7 @@ export default function InviteScreen() {
 
     setState('joining');
     try {
-      await apiClient.acceptInvite(token, { rsvp_status: 'going' });
+      await apiClient.acceptInvite(token, { rsvp_status: RsvpStatus.Going });
       if (invite?.event_id) {
         router.replace(`/event/${invite.event_id}`);
       } else {

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { apiClient } from '@/lib/claude';
-import type { Item, Assignment } from '@hangout/shared';
+import type { Item } from '@hangout/shared';
 
 /**
  * Hook that fetches items for an event and subscribes to real-time

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Event, Item } from '@hangout/shared';
+import type { Event } from '@hangout/shared';
 
 interface EventState {
   // Local cache of events (populated by React Query, mirrored here for cross-screen access)

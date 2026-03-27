@@ -3,22 +3,22 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useMyEvents } from '@/hooks/useEvent';
+import { useMyEventsWithCounts } from '@/hooks/useEvent';
 import { EventCard } from '@/components/EventCard';
-import type { EventStatus } from '@hangout/shared';
+import { EventStatus } from '@hangout/shared';
 
 const STATUS_TABS: Array<{ label: string; value: EventStatus | 'all' }> = [
   { label: 'All', value: 'all' },
-  { label: 'Active', value: 'active' },
-  { label: 'Draft', value: 'draft' },
-  { label: 'Done', value: 'completed' },
+  { label: 'Active', value: EventStatus.Active },
+  { label: 'Draft', value: EventStatus.Draft },
+  { label: 'Done', value: EventStatus.Completed },
 ];
 
 import { useState } from 'react';
 
 export default function MyEventsScreen() {
   const insets = useSafeAreaInsets();
-  const { data: events, isLoading, isRefetching, refetch } = useMyEvents();
+  const { data: events, isLoading, isRefetching, refetch } = useMyEventsWithCounts();
   const [activeTab, setActiveTab] = useState<EventStatus | 'all'>('all');
 
   const filtered = events?.filter(
@@ -110,6 +110,8 @@ export default function MyEventsScreen() {
               key={event.id}
               event={event}
               onPress={() => router.push(`/event/${event.id}`)}
+              claimedCount={event.claimedCount}
+              totalItems={event.totalItems}
             />
           ))
         )}

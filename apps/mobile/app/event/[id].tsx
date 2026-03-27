@@ -45,11 +45,18 @@ export default function EventDetailScreen() {
 
   const shareInvite = async () => {
     if (!event) return;
-    const url = `hangout://invite/${event.invite_code}`;
-    await Share.share({
-      message: `Join "${event.title}" on Hangout! ${url}`,
-      url,
-    });
+    try {
+      // Create a tracked invite token in the invites table so the deep-link
+      // screen can look it up via GET /invites/:token.
+      const invite = await apiClient.createInvite(event.id);
+      const url = `hangout://invite/${invite.token}`;
+      await Share.share({
+        message: `Join "${event.title}" on Hangout! ${url}`,
+        url,
+      });
+    } catch (err) {
+      Alert.alert('Error', 'Could not generate invite link. Try again.');
+    }
   };
 
   const claimMutation = useMutation({
@@ -125,7 +132,7 @@ export default function EventDetailScreen() {
     );
   }
 
-  const [colorStart, colorEnd] = HERO_GRADIENTS[event.hero_color] ?? HERO_GRADIENTS.coral;
+  const [colorStart] = HERO_GRADIENTS[event.hero_color] ?? HERO_GRADIENTS.coral;
 
   // Group items by category
   const itemsByCategory = (items ?? []).reduce<Record<string, typeof items>>((acc, item) => {
