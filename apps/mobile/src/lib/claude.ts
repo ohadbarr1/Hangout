@@ -87,10 +87,10 @@ export const apiClient = {
   // ─── Item endpoints ────────────────────────────────────────────────────────
 
   getItems: (eventId: string): Promise<Item[]> =>
-    request('GET', `/events/${eventId}/items`),
+    request('GET', `/items/events/${eventId}/items`),
 
   addItem: (eventId: string, payload: CreateItemPayload): Promise<Item> =>
-    request('POST', `/events/${eventId}/items`, payload),
+    request('POST', `/items/events/${eventId}/items`, payload),
 
   deleteItem: (itemId: string): Promise<void> =>
     request('DELETE', `/items/${itemId}`),

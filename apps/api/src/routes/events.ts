@@ -44,7 +44,7 @@ router.get('/', requireAuth, async (req, res) => {
     .from('event_members')
     .select('events(*)')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { referencedTable: 'events', ascending: false });
 
   if (error) {
     res.status(500).json({ data: null, error: { message: error.message } });
