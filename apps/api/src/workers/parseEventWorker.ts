@@ -15,7 +15,7 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import { createClient } from '@supabase/supabase-js';
 import { claudeService } from '../services/claudeService';
-import type { ParsedEventResponse, ParsedCategory } from '@hangout/shared';
+import type { ParsedEventResponse, ParsedCategory } from '../shared-types';
 
 const QUEUE_NAME = 'parse-event';
 

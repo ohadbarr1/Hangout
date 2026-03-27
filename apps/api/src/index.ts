@@ -1,5 +1,8 @@
-import 'dotenv/config';
 import express from 'express';
+// Only load .env file locally — Vercel injects env vars directly
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 import cors from 'cors';
 
 import { eventsRouter } from './routes/events';
@@ -66,9 +69,12 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`Hangout API running on http://localhost:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
-});
+// Only start the HTTP server when running locally (not in Vercel serverless)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Hangout API running on http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
+  });
+}
 
 export default app;

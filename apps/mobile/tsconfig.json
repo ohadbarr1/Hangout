@@ -8,14 +8,20 @@
     "noUnusedParameters": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@hangout/shared": ["../../packages/shared/src/types"]
+      "@/*": [
+        "src/*"
+      ],
+      "@hangout/shared": [
+        "../../packages/shared/src/types"
+      ]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.d.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    "nativewind-env.d.ts",
+    ".expo/types/**/*.ts"
   ]
 }

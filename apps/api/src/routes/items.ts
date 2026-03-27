@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
-import { Category } from '@hangout/shared';
+import { Category } from '../shared-types';
 
 const router = Router();
 

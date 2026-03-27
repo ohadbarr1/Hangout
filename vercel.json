@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "installCommand": "yarn install",
+  "builds": [
+    {
+      "src": "apps/api/src/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["packages/shared/**/*"]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/apps/api/src/index.ts"
+    }
+  ]
+}

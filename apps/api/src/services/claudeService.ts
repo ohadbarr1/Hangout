@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ParsedEventResponse } from '@hangout/shared';
+import type { ParsedEventResponse } from '../shared-types';
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
