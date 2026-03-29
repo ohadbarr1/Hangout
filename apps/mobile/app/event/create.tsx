@@ -133,6 +133,9 @@ export default function CreateEventScreen() {
               numberOfLines={5}
               textAlignVertical="top"
               autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleParse}
+              blurOnSubmit
               className="text-charcoal text-base leading-6"
               style={{
                 fontFamily: 'Inter-Regular',

@@ -226,6 +226,15 @@ export default function EventDetailScreen() {
           >
             {event.title}
           </Text>
+          {event.description ? (
+            <Text
+              className="text-white/75 text-sm mb-3 leading-5"
+              style={{ fontFamily: 'Inter-Regular' }}
+              numberOfLines={3}
+            >
+              {event.description}
+            </Text>
+          ) : null}
           <View className="flex-row flex-wrap gap-3 mb-5">
             {event.event_date && (
               <HeroBadge icon="calendar-outline" label={formatDate(event.event_date)} />

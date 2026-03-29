@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -26,6 +26,8 @@ export default function SignInScreen() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -142,6 +144,9 @@ export default function SignInScreen() {
                   placeholder="Your name"
                   placeholderTextColor="#9999B8"
                   autoCapitalize="words"
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                  blurOnSubmit={false}
                   className="bg-white border border-charcoal/10 rounded-2xl px-4 py-4 text-charcoal text-base"
                   style={{ fontFamily: 'Inter-Regular' }}
                 />
@@ -156,6 +161,7 @@ export default function SignInScreen() {
                 Email
               </Text>
               <TextInput
+                ref={emailRef}
                 value={email}
                 onChangeText={setEmail}
                 placeholder="you@example.com"
@@ -163,6 +169,9 @@ export default function SignInScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                blurOnSubmit={false}
                 className="bg-white border border-charcoal/10 rounded-2xl px-4 py-4 text-charcoal text-base"
                 style={{ fontFamily: 'Inter-Regular' }}
               />
@@ -177,11 +186,14 @@ export default function SignInScreen() {
               </Text>
               <View className="relative">
                 <TextInput
+                  ref={passwordRef}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="At least 8 characters"
                   placeholderTextColor="#9999B8"
                   secureTextEntry={!showPassword}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
                   className="bg-white border border-charcoal/10 rounded-2xl px-4 py-4 text-charcoal text-base pr-12"
                   style={{ fontFamily: 'Inter-Regular' }}
                 />
