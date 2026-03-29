@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
@@ -15,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/components/Toast';
 
 type Mode = 'sign-in' | 'sign-up';
 
@@ -29,11 +29,11 @@ export default function SignInScreen() {
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing fields', 'Please enter your email and password.');
+      showAlert('Missing fields', 'Please enter your email and password.');
       return;
     }
     if (mode === 'sign-up' && !name.trim()) {
-      Alert.alert('Missing name', 'Please enter your name.');
+      showAlert('Missing name', 'Please enter your name.');
       return;
     }
 
@@ -43,7 +43,7 @@ export default function SignInScreen() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           if (error.message.toLowerCase().includes('email not confirmed')) {
-            Alert.alert(
+            showAlert(
               'Email not confirmed',
               'Please check your inbox and click the confirmation link before signing in.',
               [
@@ -51,14 +51,14 @@ export default function SignInScreen() {
                   text: 'Resend email',
                   onPress: async () => {
                     await supabase.auth.resend({ type: 'signup', email });
-                    Alert.alert('Sent!', 'Check your inbox for a new confirmation link.');
+                    showAlert('Sent!', 'Check your inbox for a new confirmation link.');
                   },
                 },
                 { text: 'OK', style: 'cancel' },
               ],
             );
           } else if (error.message.toLowerCase().includes('invalid login credentials')) {
-            Alert.alert('Incorrect credentials', 'Email or password is wrong. Try again.');
+            showAlert('Incorrect credentials', 'Email or password is wrong. Try again.');
           } else {
             throw error;
           }
@@ -76,14 +76,14 @@ export default function SignInScreen() {
         if (data.session) {
           router.replace('/(tabs)/');
         } else {
-          Alert.alert(
+          showAlert(
             'Check your email',
             `We sent a confirmation link to ${email}. Click it to activate your account, then come back to sign in.`,
           );
         }
       }
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Something went wrong.');
+      showAlert('Error', err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setLoading(false);
     }
@@ -198,6 +198,33 @@ export default function SignInScreen() {
               </View>
             </View>
           </View>
+
+          {/* Forgot password */}
+          {mode === 'sign-in' && (
+            <TouchableOpacity
+              className="mt-4 self-end"
+              onPress={async () => {
+                if (!email.trim()) {
+                  showAlert('No email', 'Enter your email above first.');
+                  return;
+                }
+                await supabase.auth.resetPasswordForEmail(email.trim(), {
+                  redirectTo:
+                    Platform.OS === 'web'
+                      ? (window as Window).location.origin + '/'
+                      : undefined,
+                });
+                showAlert('Email sent', 'Check your email for a reset link.');
+              }}
+            >
+              <Text
+                className="text-primary text-sm"
+                style={{ fontFamily: 'Inter-Medium' }}
+              >
+                Forgot password?
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* CTA */}
           <TouchableOpacity

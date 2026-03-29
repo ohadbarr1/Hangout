@@ -84,9 +84,10 @@ router.get('/invites/:token', async (req, res) => {
     return;
   }
 
-  // Check if already used (single-use invites)
-  if (invite.used_by) {
-    res.status(410).json({ data: null, error: { message: 'This invite link has already been used', code: 'USED' } });
+  // Check if the event is still active
+  const eventData = invite.event as { id: string; status: string } | null;
+  if (eventData && (eventData.status === 'cancelled' || eventData.status === 'completed')) {
+    res.status(410).json({ data: null, error: { message: 'This event is no longer available', code: 'EVENT_UNAVAILABLE' } });
     return;
   }
 
@@ -115,11 +116,6 @@ router.post('/invites/:token/accept', requireAuth, validateBody(acceptInviteSche
     return;
   }
 
-  if (invite.used_by) {
-    res.status(410).json({ data: null, error: { message: 'Invite already used', code: 'USED' } });
-    return;
-  }
-
   const eventData = invite.event as { id: string; status: string } | null;
   if (!eventData || eventData.status === 'cancelled') {
     res.status(400).json({ data: null, error: { message: 'This event is no longer available', code: 'EVENT_UNAVAILABLE' } });
@@ -143,11 +139,13 @@ router.post('/invites/:token/accept', requireAuth, validateBody(acceptInviteSche
     return;
   }
 
-  // Mark invite as used
+  // Track usage for analytics (does not invalidate the invite — invites are multi-use)
   await supabase
-    .from('invites')
-    .update({ used_by: userId, used_at: new Date().toISOString() })
-    .eq('id', invite.id);
+    .from('invite_acceptances')
+    .insert({ invite_id: invite.id, user_id: userId, accepted_at: new Date().toISOString() })
+    .catch(() => {
+      // Non-critical: table may not exist yet. Invite acceptance still succeeds.
+    });
 
   res.json({ data: membership, error: null });
 });

@@ -6,7 +6,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
   Animated,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '@/lib/claude';
+import { showAlert } from '@/components/Toast';
 import { ItemCard } from '@/components/ItemCard';
 import type { ParsedEventResponse, ParsedCategory } from '@hangout/shared';
 
@@ -42,7 +42,7 @@ export default function CreateEventScreen() {
     },
     onError: (err) => {
       setStep('input');
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to parse event. Please try again.');
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to parse event. Please try again.');
     },
   });
 
@@ -56,13 +56,13 @@ export default function CreateEventScreen() {
       router.replace(`/event/${event.id}`);
     },
     onError: (err) => {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create event.');
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to create event.');
     },
   });
 
   const handleParse = () => {
     if (!description.trim()) {
-      Alert.alert('Describe your event', 'Tell us what you\'re planning.');
+      showAlert('Describe your event', 'Tell us what you\'re planning.');
       return;
     }
     setStep('loading');
@@ -187,7 +187,14 @@ export default function CreateEventScreen() {
         </ScrollView>
       )}
 
-      {step === 'loading' && <LoadingState />}
+      {step === 'loading' && (
+        <LoadingState
+          onCancel={() => {
+            parseMutation.reset();
+            setStep('input');
+          }}
+        />
+      )}
 
       {step === 'review' && parsedEvent && (
         <ReviewStep
@@ -208,7 +215,7 @@ const LOADING_MESSAGES = [
   'Almost ready...',
 ];
 
-function LoadingState() {
+function LoadingState({ onCancel }: { onCancel: () => void }) {
   const [messageIndex, setMessageIndex] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
 
@@ -262,6 +269,15 @@ function LoadingState() {
           />
         ))}
       </View>
+
+      <TouchableOpacity onPress={onCancel} className="mt-10">
+        <Text
+          className="text-charcoal/50 text-sm"
+          style={{ fontFamily: 'Inter-Medium' }}
+        >
+          Cancel
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }

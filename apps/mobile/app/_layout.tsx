@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { View, Platform } from 'react-native';
 import { Stack, SplashScreen, router } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
@@ -22,7 +23,7 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
-  const { session, setSession, setUser } = useAuthStore();
+  const { session, setSession, setUser, pendingInviteToken, setPendingInviteToken } = useAuthStore();
 
   const [fontsLoaded, fontError] = useFonts({
     'PlusJakartaSans-Regular': require('../assets/fonts/PlusJakartaSans-Regular.ttf'),
@@ -80,7 +81,14 @@ export default function RootLayout() {
   useEffect(() => {
     if (!fontsLoaded && !fontError) return;
     if (session) {
-      router.replace('/(tabs)/');
+      // If there's a pending invite token from before auth, redirect there
+      if (pendingInviteToken) {
+        const token = pendingInviteToken;
+        setPendingInviteToken(null);
+        router.replace(`/invite/${token}`);
+      } else {
+        router.replace('/(tabs)/');
+      }
     } else {
       router.replace('/(auth)/welcome');
     }
@@ -88,7 +96,7 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
-  return (
+  const appContent = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="auto" />
@@ -104,6 +112,10 @@ export default function RootLayout() {
           />
           <Stack.Screen name="event/[id]" />
           <Stack.Screen
+            name="event/[id]/edit"
+            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen
             name="event/[id]/items"
             options={{ presentation: 'modal' }}
           />
@@ -115,4 +127,28 @@ export default function RootLayout() {
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#E8E4DF', alignItems: 'center' }}>
+        <View
+          style={{
+            maxWidth: 480,
+            width: '100%',
+            minHeight: '100%',
+            backgroundColor: '#FAF9F7',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+            elevation: 4,
+          }}
+        >
+          {appContent}
+        </View>
+      </View>
+    );
+  }
+
+  return appContent;
 }

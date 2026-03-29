@@ -3,21 +3,29 @@ import {
   Text,
   TouchableOpacity,
   Image,
-  Alert,
   ScrollView,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/components/Toast';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
+
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   const handleSignOut = () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+    showAlert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out',
@@ -29,22 +37,33 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const handleEditProfile = () => {
+    setNewName(user?.name ?? '');
+    setEditModalVisible(true);
+  };
+
+  const handleSaveName = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      showAlert('Name required', 'Please enter a display name.');
+      return;
+    }
+    setSavingName(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ data: { full_name: trimmed } });
+      if (error) throw error;
+      if (user) {
+        setUser({ ...user, name: trimmed });
+      }
+      setEditModalVisible(false);
+    } catch (err) {
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to update name.');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   const menuItems: Array<{ icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; destructive?: boolean }> = [
-    {
-      icon: 'notifications-outline',
-      label: 'Notification preferences',
-      onPress: () => Alert.alert('Coming soon', 'Notification settings coming soon.'),
-    },
-    {
-      icon: 'shield-checkmark-outline',
-      label: 'Privacy',
-      onPress: () => Alert.alert('Coming soon', 'Privacy settings coming soon.'),
-    },
-    {
-      icon: 'help-circle-outline',
-      label: 'Help & Feedback',
-      onPress: () => Alert.alert('Coming soon', 'Help center coming soon.'),
-    },
     {
       icon: 'log-out-outline',
       label: 'Sign out',
@@ -105,7 +124,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             className="mt-4 border border-primary/30 rounded-xl px-5 py-2.5"
-            onPress={() => Alert.alert('Coming soon', 'Profile editing coming soon.')}
+            onPress={handleEditProfile}
           >
             <Text
               className="text-primary text-sm"
@@ -155,6 +174,73 @@ export default function ProfileScreen() {
           Hangout v1.0.0
         </Text>
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/40 items-center justify-center px-6">
+          <View className="bg-white w-full rounded-3xl p-6">
+            <Text
+              className="text-charcoal text-lg mb-5"
+              style={{ fontFamily: 'PlusJakartaSans-Bold' }}
+            >
+              Edit Profile
+            </Text>
+
+            <Text
+              className="text-charcoal/70 text-sm mb-2"
+              style={{ fontFamily: 'Inter-Medium' }}
+            >
+              Display name
+            </Text>
+            <TextInput
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="Your name"
+              placeholderTextColor="#9999B8"
+              autoCapitalize="words"
+              className="bg-warmwhite border border-charcoal/10 rounded-2xl px-4 py-4 text-charcoal text-base mb-6"
+              style={{ fontFamily: 'Inter-Regular' }}
+            />
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                className="flex-1 rounded-2xl py-3.5 items-center border border-charcoal/10"
+                disabled={savingName}
+              >
+                <Text
+                  className="text-charcoal/70 text-base"
+                  style={{ fontFamily: 'Inter-Medium' }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveName}
+                disabled={savingName}
+                className="flex-1 rounded-2xl py-3.5 items-center bg-primary"
+                style={{ opacity: savingName ? 0.6 : 1 }}
+              >
+                {savingName ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text
+                    className="text-white text-base"
+                    style={{ fontFamily: 'Inter-SemiBold' }}
+                  >
+                    Save
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

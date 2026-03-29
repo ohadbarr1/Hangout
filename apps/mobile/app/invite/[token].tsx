@@ -3,7 +3,6 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiClient } from '@/lib/claude';
 import { useAuthStore } from '@/stores/authStore';
+import { showAlert } from '@/components/Toast';
 import { RsvpStatus } from '@hangout/shared';
 import type { Invite } from '@hangout/shared';
 
@@ -43,9 +43,12 @@ export default function InviteScreen() {
     }
   };
 
+  const { setPendingInviteToken } = useAuthStore();
+
   const handleAccept = async () => {
     if (!session) {
-      // Store token and redirect to auth
+      // Store invite token so _layout.tsx can redirect back after auth
+      setPendingInviteToken(token);
       router.replace(`/(auth)/welcome`);
       return;
     }
@@ -60,7 +63,7 @@ export default function InviteScreen() {
       }
     } catch (err) {
       setState('preview');
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to join event.');
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to join event.');
     }
   };
 

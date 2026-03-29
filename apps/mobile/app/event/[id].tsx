@@ -4,8 +4,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Share,
-  Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { AvatarGroup } from '@/components/AvatarGroup';
 import { ItemCard } from '@/components/ItemCard';
 import { apiClient } from '@/lib/claude';
+import { showAlert } from '@/components/Toast';
 import type { Category } from '@hangout/shared';
 
 const HERO_GRADIENTS: Record<string, [string, string]> = {
@@ -49,13 +50,33 @@ export default function EventDetailScreen() {
       // Create a tracked invite token in the invites table so the deep-link
       // screen can look it up via GET /invites/:token.
       const invite = await apiClient.createInvite(event.id);
-      const url = `hangout://invite/${invite.token}`;
-      await Share.share({
-        message: `Join "${event.title}" on Hangout! ${url}`,
-        url,
-      });
+
+      const url =
+        Platform.OS === 'web'
+          ? `${window.location.origin}/invite/${invite.token}`
+          : `hangout://invite/${invite.token}`;
+
+      const shareText = `Join "${event.title}" on Hangout! ${url}`;
+
+      if (Platform.OS === 'web') {
+        // Use Web Share API if available, otherwise copy to clipboard
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          await navigator.share({ title: event.title, text: shareText, url });
+        } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          await navigator.clipboard.writeText(shareText);
+          showAlert('Copied!', 'Invite link copied to clipboard.');
+        }
+      } else {
+        await Share.share({
+          message: shareText,
+          url,
+        });
+      }
     } catch (err) {
-      Alert.alert('Error', 'Could not generate invite link. Try again.');
+      // User cancelling the share dialog throws — ignore that, only alert real errors
+      if (err instanceof Error && err.message !== 'Share was dismissed') {
+        showAlert('Error', 'Could not generate invite link. Try again.');
+      }
     }
   };
 
@@ -79,7 +100,7 @@ export default function EventDetailScreen() {
       if (context?.prev) {
         queryClient.setQueryData(['items', id], context.prev);
       }
-      Alert.alert('Error', 'Failed to claim item. Try again.');
+      showAlert('Error', 'Failed to claim item. Try again.');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['items', id] });
@@ -180,12 +201,20 @@ export default function EventDetailScreen() {
                 </Text>
               </TouchableOpacity>
               {isAdmin && (
-                <TouchableOpacity
-                  onPress={() => router.push(`/event/${id}/items`)}
-                  className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
-                >
-                  <Ionicons name="settings-outline" size={20} color="#fff" />
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/event/${id}/edit`)}
+                    className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
+                  >
+                    <Ionicons name="create-outline" size={20} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/event/${id}/items`)}
+                    className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
+                  >
+                    <Ionicons name="settings-outline" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </>
               )}
             </View>
           </View>

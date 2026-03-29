@@ -21,6 +21,9 @@ export function useItems(eventId: string | undefined) {
     staleTime: 15_000,
   });
 
+  // Derive the loaded item IDs so we can filter the assignments subscription
+  const itemIds = query.data?.map((item) => item.id) ?? [];
+
   // Real-time: items table changes
   useEffect(() => {
     if (!eventId) return;
@@ -56,15 +59,25 @@ export function useItems(eventId: string | undefined) {
       )
       .subscribe();
 
-    // Real-time: assignments changes (claim/unclaim)
+    return () => {
+      supabase.removeChannel(itemsChannel);
+    };
+  }, [eventId, queryClient]);
+
+  // Real-time: assignments changes (claim/unclaim), filtered to this event's items
+  useEffect(() => {
+    if (!eventId || itemIds.length === 0) return;
+
+    // Filter by item_id so only assignment changes for this event's items trigger a refetch
     const assignmentsChannel = supabase
-      .channel(`assignments:event_id=eq.${eventId}`)
+      .channel(`assignments:event:${eventId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'assignments',
+          filter: `item_id=in.(${itemIds.join(',')})`,
         },
         () => {
           // Invalidate and refetch items so assignment join is fresh
@@ -74,10 +87,10 @@ export function useItems(eventId: string | undefined) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(itemsChannel);
       supabase.removeChannel(assignmentsChannel);
     };
-  }, [eventId, queryClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, queryClient, itemIds.join(',')]);
 
   return query;
 }

@@ -4,7 +4,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -16,6 +15,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useItems } from '@/hooks/useItems';
 import { ItemCard } from '@/components/ItemCard';
 import { apiClient } from '@/lib/claude';
+import { showAlert } from '@/components/Toast';
 import { Category } from '@hangout/shared';
 
 const CATEGORIES = Object.values(Category);
@@ -46,7 +46,7 @@ export default function ItemsManagementScreen() {
       setNewItemQty('');
     },
     onError: (err) => {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add item.');
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to add item.');
     },
   });
 
@@ -59,7 +59,7 @@ export default function ItemsManagementScreen() {
 
   const handleAddItem = () => {
     if (!newItemName.trim()) {
-      Alert.alert('Name required', 'Enter a name for the item.');
+      showAlert('Name required', 'Enter a name for the item.');
       return;
     }
     addMutation.mutate();
@@ -200,7 +200,7 @@ export default function ItemsManagementScreen() {
                 item={item}
                 adminMode
                 onDelete={() => {
-                  Alert.alert('Delete item', `Remove "${item.name}"?`, [
+                  showAlert('Delete item', `Remove "${item.name}"?`, [
                     { text: 'Cancel', style: 'cancel' },
                     {
                       text: 'Delete',

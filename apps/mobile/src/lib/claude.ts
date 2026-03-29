@@ -113,4 +113,14 @@ export const apiClient = {
 
   acceptInvite: (token: string, payload?: AcceptInvitePayload): Promise<EventMember> =>
     request('POST', `/invites/${token}/accept`, payload ?? {}),
+
+  // ─── Event update ──────────────────────────────────────────────────────────
+
+  updateEvent: (id: string, data: Partial<{title: string, description: string, event_date: string, location: string, hero_color: string, status: string}>): Promise<Event> =>
+    request('PATCH', `/events/${id}`, data),
+
+  // ─── Event delete ──────────────────────────────────────────────────────────
+
+  deleteEvent: (id: string): Promise<void> =>
+    request('DELETE', `/events/${id}`),
 };

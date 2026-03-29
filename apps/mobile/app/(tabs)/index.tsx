@@ -12,7 +12,16 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuthStore } from '@/stores/authStore';
 import { useMyEventsWithCounts } from '@/hooks/useEvent';
+import type { EventWithCounts } from '@/hooks/useEvent';
 import { EventCard } from '@/components/EventCard';
+
+const HERO_COLORS: Record<string, string> = {
+  coral: '#FF6B4A',
+  violet: '#7B61FF',
+  mint: '#06D6A0',
+  golden: '#FFD166',
+  charcoal: '#2E2E50',
+};
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -21,13 +30,41 @@ export default function HomeScreen() {
 
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
-  const upcomingEvents = events?.filter(
-    (e) => e.status === 'active' || e.status === 'draft',
-  ) ?? [];
+  const allEvents = events ?? [];
 
-  const pastEvents = events?.filter(
-    (e) => e.status === 'completed' || e.status === 'cancelled',
-  ) ?? [];
+  // --- Next hangout: upcoming active/draft events sorted by event_date, fallback to created_at ---
+  const activeEvents = allEvents.filter(
+    (e) => e.status === 'active' || e.status === 'draft',
+  );
+
+  const nextHangout: EventWithCounts | null = activeEvents.length > 0
+    ? activeEvents.slice().sort((a, b) => {
+        if (a.event_date && b.event_date) {
+          return new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
+        }
+        if (a.event_date) return -1;
+        if (b.event_date) return 1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      })[0]
+    : null;
+
+  // --- Needs attention: unclaimed items, max 3, excluding the nextHangout ---
+  const needsAttention = allEvents
+    .filter(
+      (e) =>
+        e.claimedCount < e.totalItems &&
+        e.totalItems > 0 &&
+        e.id !== nextHangout?.id,
+    )
+    .slice(0, 3);
+
+  // --- Recently active: last 2-3 by created_at desc, excluding nextHangout and needsAttention ---
+  const attentionIds = new Set(needsAttention.map((e) => e.id));
+  const recentlyActive = allEvents
+    .filter((e) => e.id !== nextHangout?.id && !attentionIds.has(e.id))
+    .slice()
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 3);
 
   return (
     <View
@@ -83,20 +120,37 @@ export default function HomeScreen() {
           <View className="items-center justify-center pt-20">
             <ActivityIndicator color="#FF6B4A" size="large" />
           </View>
-        ) : upcomingEvents.length === 0 && pastEvents.length === 0 ? (
+        ) : allEvents.length === 0 ? (
           <EmptyState onCreatePress={() => router.push('/event/create')} />
         ) : (
           <>
-            {upcomingEvents.length > 0 && (
+            {/* Your next hangout */}
+            {nextHangout && (
               <View className="mt-6">
                 <Text
-                  className="text-charcoal text-lg mb-4"
+                  className="text-charcoal text-lg mb-3"
                   style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}
                 >
-                  Upcoming
+                  Your next hangout
+                </Text>
+                <NextHangoutCard
+                  event={nextHangout}
+                  onPress={() => router.push(`/event/${nextHangout.id}`)}
+                />
+              </View>
+            )}
+
+            {/* Needs your attention */}
+            {needsAttention.length > 0 && (
+              <View className="mt-8">
+                <Text
+                  className="text-charcoal text-lg mb-3"
+                  style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}
+                >
+                  Needs your attention
                 </Text>
                 <View className="gap-3">
-                  {upcomingEvents.map((event) => (
+                  {needsAttention.map((event) => (
                     <EventCard
                       key={event.id}
                       event={event}
@@ -109,21 +163,21 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {pastEvents.length > 0 && (
+            {/* Recently active */}
+            {recentlyActive.length > 0 && (
               <View className="mt-8">
                 <Text
-                  className="text-charcoal/50 text-base mb-3"
+                  className="text-charcoal text-lg mb-3"
                   style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}
                 >
-                  Past events
+                  Recently active
                 </Text>
                 <View className="gap-3">
-                  {pastEvents.map((event) => (
+                  {recentlyActive.map((event) => (
                     <EventCard
                       key={event.id}
                       event={event}
                       onPress={() => router.push(`/event/${event.id}`)}
-                      muted
                       claimedCount={event.claimedCount}
                       totalItems={event.totalItems}
                     />
@@ -135,6 +189,73 @@ export default function HomeScreen() {
         )}
       </ScrollView>
     </View>
+  );
+}
+
+function NextHangoutCard({
+  event,
+  onPress,
+}: {
+  event: EventWithCounts;
+  onPress: () => void;
+}) {
+  const accentColor = HERO_COLORS[event.hero_color] ?? HERO_COLORS.coral;
+  const progressPercent =
+    event.totalItems > 0
+      ? Math.round((event.claimedCount / event.totalItems) * 100)
+      : 0;
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.88}
+      className="rounded-3xl overflow-hidden shadow-sm shadow-charcoal/5"
+      style={{ backgroundColor: accentColor }}
+    >
+      <View className="p-5">
+        <Text
+          className="text-white text-xl mb-1"
+          style={{ fontFamily: 'PlusJakartaSans-Bold' }}
+          numberOfLines={2}
+        >
+          {event.title}
+        </Text>
+
+        {event.event_date && (
+          <Text
+            className="text-white/80 text-sm mb-4"
+            style={{ fontFamily: 'Inter-Regular' }}
+          >
+            📅 {formatDate(event.event_date)}
+          </Text>
+        )}
+
+        {event.totalItems > 0 && (
+          <View>
+            <View className="flex-row justify-between mb-1.5">
+              <Text
+                className="text-white/70 text-xs"
+                style={{ fontFamily: 'Inter-Regular' }}
+              >
+                {event.claimedCount}/{event.totalItems} items claimed
+              </Text>
+              <Text
+                className="text-white text-xs"
+                style={{ fontFamily: 'Inter-Medium' }}
+              >
+                {progressPercent}%
+              </Text>
+            </View>
+            <View className="h-1.5 bg-white/30 rounded-full overflow-hidden">
+              <View
+                className="h-full rounded-full bg-white"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </View>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -168,6 +289,11 @@ function EmptyState({ onCreatePress }: { onCreatePress: () => void }) {
       </TouchableOpacity>
     </View>
   );
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function getGreeting(): string {

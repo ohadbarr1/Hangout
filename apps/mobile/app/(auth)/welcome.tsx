@@ -3,7 +3,6 @@ import {
   Text,
   TouchableOpacity,
   Platform,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +14,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
 import { supabase } from '@/lib/supabase';
+import { showAlert } from '@/components/Toast';
 
 // Required for expo-web-browser OAuth on native
 WebBrowser.maybeCompleteAuthSession();
@@ -56,7 +56,7 @@ export default function WelcomeScreen() {
         }
       }
     } catch (err) {
-      Alert.alert('Sign in failed', err instanceof Error ? err.message : 'Unknown error');
+      showAlert('Sign in failed', err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoadingProvider(null);
     }
