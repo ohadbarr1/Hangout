@@ -6,11 +6,13 @@ import {
   Share,
   ActivityIndicator,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { useEvent, useEventMembers } from '@/hooks/useEvent';
 import { useItems } from '@/hooks/useItems';
@@ -36,9 +38,19 @@ export default function EventDetailScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data: event, isLoading: eventLoading } = useEvent(id);
-  const { data: items, isLoading: itemsLoading } = useItems(id);
-  const { data: members } = useEventMembers(id);
+  const { data: event, isLoading: eventLoading, refetch: refetchEvent } = useEvent(id);
+  const { data: items, isLoading: itemsLoading, refetch: refetchItems } = useItems(id);
+  const { data: members, refetch: refetchMembers } = useEventMembers(id);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const myMembership = members?.find((m) => m.user_id === user?.id);
+  const myRsvp = myMembership?.rsvp_status ?? null;
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([refetchEvent(), refetchItems(), refetchMembers()]);
+    setIsRefreshing(false);
+  };
 
   const claimedCount = items?.filter((i) => i.assignment != null).length ?? 0;
   const totalCount = items?.length ?? 0;
@@ -130,6 +142,17 @@ export default function EventDetailScreen() {
     },
   });
 
+  const rsvpMutation = useMutation({
+    mutationFn: (rsvp_status: 'going' | 'maybe' | 'not_going') =>
+      apiClient.updateRsvp(id!, rsvp_status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event-members', id] });
+    },
+    onError: () => {
+      showAlert('Error', 'Failed to update RSVP. Try again.');
+    },
+  });
+
   if (eventLoading) {
     return (
       <View className="flex-1 bg-warmwhite items-center justify-center">
@@ -169,6 +192,9 @@ export default function EventDetailScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FF6B4A" />
+        }
       >
         {/* Hero */}
         <View
@@ -279,6 +305,48 @@ export default function EventDetailScreen() {
             )}
           </View>
         </View>
+
+        {/* RSVP buttons */}
+        {myMembership && (
+          <View className="px-5 pt-5">
+            <Text
+              className="text-charcoal/50 text-xs mb-2"
+              style={{ fontFamily: 'Inter-Medium' }}
+            >
+              Your RSVP
+            </Text>
+            <View className="flex-row gap-2">
+              {([
+                { status: 'going' as const, label: 'Going', emoji: '✅' },
+                { status: 'maybe' as const, label: 'Maybe', emoji: '🤔' },
+                { status: 'not_going' as const, label: "Can't go", emoji: '❌' },
+              ]).map(({ status, label, emoji }) => {
+                const isSelected = myRsvp === status;
+                return (
+                  <TouchableOpacity
+                    key={status}
+                    onPress={() => !isAdmin && rsvpMutation.mutate(status)}
+                    disabled={isAdmin || rsvpMutation.isPending}
+                    className={`flex-1 flex-row items-center justify-center rounded-2xl py-2.5 gap-1.5 border ${
+                      isSelected
+                        ? 'bg-primary border-primary'
+                        : 'bg-white border-charcoal/10'
+                    }`}
+                    activeOpacity={isAdmin ? 1 : 0.75}
+                  >
+                    <Text style={{ fontSize: 13 }}>{emoji}</Text>
+                    <Text
+                      className={`text-xs ${isSelected ? 'text-white' : 'text-charcoal/70'}`}
+                      style={{ fontFamily: 'Inter-Medium' }}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Items by category */}
         <View className="px-5 pt-6">

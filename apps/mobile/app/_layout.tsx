@@ -9,6 +9,7 @@ import '../global.css';
 
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -97,6 +98,7 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   const appContent = (
+    <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="auto" />
@@ -126,6 +128,7 @@ export default function RootLayout() {
         </Stack>
       </QueryClientProvider>
     </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 
   if (Platform.OS === 'web') {

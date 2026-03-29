@@ -177,10 +177,10 @@ export default function WelcomeScreen() {
           </TouchableOpacity>
 
           <Text
-            className="text-white/60 text-xs text-center mt-2"
+            className="text-white/50 text-xs text-center mt-2"
             style={{ fontFamily: 'Inter-Regular' }}
           >
-            By continuing you agree to our Terms of Service{'\n'}and Privacy Policy.
+            By continuing you agree to Hangout's{'\n'}Terms of Service and Privacy Policy.
           </Text>
         </View>
       </View>

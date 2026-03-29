@@ -123,4 +123,9 @@ export const apiClient = {
 
   deleteEvent: (id: string): Promise<void> =>
     request('DELETE', `/events/${id}`),
+
+  // ─── RSVP ─────────────────────────────────────────────────────────────────
+
+  updateRsvp: (eventId: string, rsvp_status: 'going' | 'maybe' | 'not_going'): Promise<EventMember> =>
+    request('PATCH', `/events/${eventId}/rsvp`, { rsvp_status }),
 };

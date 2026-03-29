@@ -217,6 +217,42 @@ router.patch('/:id', requireAuth, validateBody(updateEventSchema), async (req, r
   res.json({ data: updated, error: null });
 });
 
+// ─── PATCH /events/:id/rsvp — update my RSVP status ─────────────────────────
+
+router.patch('/:id/rsvp', requireAuth, validateBody(z.object({
+  rsvp_status: z.enum(['going', 'maybe', 'not_going']),
+})), async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { id } = req.params;
+
+  const { data: membership } = await supabase
+    .from('event_members')
+    .select('id')
+    .eq('event_id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!membership) {
+    res.status(403).json({ data: null, error: { message: 'You are not a member of this event', code: 'FORBIDDEN' } });
+    return;
+  }
+
+  const { data: updated, error } = await supabase
+    .from('event_members')
+    .update({ rsvp_status: req.body.rsvp_status })
+    .eq('event_id', id)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    res.status(500).json({ data: null, error: { message: error.message } });
+    return;
+  }
+
+  res.json({ data: updated, error: null });
+});
+
 // ─── DELETE /events/:id ───────────────────────────────────────────────────────
 
 router.delete('/:id', requireAuth, async (req, res) => {
