@@ -61,7 +61,7 @@ export const notificationService = {
       throw new Error(`Expo Push API error ${response.status}: ${text}`);
     }
 
-    const result: PushResponse = await response.json();
+    const result = await response.json() as PushResponse;
     const firstResult = result.data[0];
 
     if (firstResult?.status === 'error') {

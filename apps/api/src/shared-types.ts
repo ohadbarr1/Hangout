@@ -57,6 +57,9 @@ export interface Event {
   invite_code: string;
   hero_color: string;
   created_at: string;
+  // Optional item progress counts — populated by GET /events list endpoint
+  total_items?: number;
+  claimed_items?: number;
 }
 
 export interface Item {

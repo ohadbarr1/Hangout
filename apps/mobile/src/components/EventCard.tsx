@@ -1,5 +1,7 @@
+import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import type { Event } from '@hangout/shared';
+import { formatDate } from '@/utils/dateUtils';
 
 const HERO_COLORS: Record<string, string> = {
   coral: '#FF6B4A',
@@ -19,7 +21,7 @@ interface EventCardProps {
   attendeeAvatars?: Array<{ id: string; name: string; avatar_url: string | null }>;
 }
 
-export function EventCard({
+export const EventCard = React.memo(function EventCard({
   event,
   onPress,
   muted = false,
@@ -115,7 +117,7 @@ export function EventCard({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 function StatusBadge({ status }: { status: Event['status'] }) {
   const config: Record<string, { label: string; bg: string; text: string }> = {
@@ -179,17 +181,4 @@ function MiniAvatarGroup({
       )}
     </View>
   );
-}
-
-function formatDate(dateStr: string): string {
-  const target = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  target.setHours(0, 0, 0, 0);
-  const diff = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Tomorrow';
-  if (diff === -1) return 'Yesterday';
-  if (diff > 1 && diff <= 6) return `In ${diff} days`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }

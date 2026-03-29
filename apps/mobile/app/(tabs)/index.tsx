@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useMyEventsWithCounts } from '@/hooks/useEvent';
 import type { EventWithCounts } from '@/hooks/useEvent';
 import { EventCard } from '@/components/EventCard';
+import { formatDate } from '@/utils/dateUtils';
 
 const HERO_COLORS: Record<string, string> = {
   coral: '#FF6B4A',
@@ -289,19 +290,6 @@ function EmptyState({ onCreatePress }: { onCreatePress: () => void }) {
       </TouchableOpacity>
     </View>
   );
-}
-
-function formatDate(dateStr: string): string {
-  const target = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  target.setHours(0, 0, 0, 0);
-  const diff = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Tomorrow';
-  if (diff === -1) return 'Yesterday';
-  if (diff > 1 && diff <= 6) return `In ${diff} days`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function getGreeting(): string {

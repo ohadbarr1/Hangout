@@ -140,19 +140,19 @@ router.post('/invites/:token/accept', requireAuth, validateBody(acceptInviteSche
   }
 
   // Track usage for analytics (does not invalidate the invite — invites are multi-use)
-  await supabase
-    .from('invite_acceptances')
-    .insert({ invite_id: invite.id, user_id: userId, accepted_at: new Date().toISOString() })
-    .catch(() => {
-      // Non-critical: table may not exist yet. Invite acceptance still succeeds.
-    });
+  try {
+    await supabase
+      .from('invite_acceptances')
+      .insert({ invite_id: invite.id, user_id: userId, accepted_at: new Date().toISOString() });
+  } catch {
+    // Non-critical: table may not exist yet. Invite acceptance still succeeds.
+  }
 
   res.json({ data: membership, error: null });
 });
 
 function generateToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return require('crypto').randomBytes(24).toString('hex'); // 48 chars, 192-bit entropy
 }
 
 export { router as invitesRouter };

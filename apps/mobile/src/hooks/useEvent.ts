@@ -17,7 +17,7 @@ export function useMyEvents() {
   return useQuery<Event[]>({
     queryKey: ['events'],
     queryFn: () => apiClient.getMyEvents(),
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -58,7 +58,7 @@ export function useMyEventsWithCounts() {
         claimedCount: countMap[event.id]?.claimed ?? 0,
       }));
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 

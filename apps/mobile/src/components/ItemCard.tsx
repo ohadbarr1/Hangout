@@ -1,3 +1,4 @@
+import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Item } from '@hangout/shared';
@@ -14,7 +15,7 @@ interface ItemCardProps {
   adminMode?: boolean;
 }
 
-export function ItemCard({
+export const ItemCard = React.memo(function ItemCard({
   item,
   currentUserId,
   onClaim,
@@ -150,4 +151,4 @@ export function ItemCard({
       )}
     </View>
   );
-}
+});

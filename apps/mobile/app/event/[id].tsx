@@ -23,6 +23,8 @@ import { ItemCard } from '@/components/ItemCard';
 import { apiClient } from '@/lib/claude';
 import { showAlert } from '@/components/Toast';
 import type { Category } from '@hangout/shared';
+import { formatDate } from '@/utils/dateUtils';
+import { categoryEmoji } from '@/utils/categoryUtils';
 
 const HERO_GRADIENTS: Record<string, [string, string]> = {
   coral: ['#FF6B4A', '#FF9472'],
@@ -403,16 +405,3 @@ function HeroBadge({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; labe
   );
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function categoryEmoji(cat: Category): string {
-  const map: Record<string, string> = {
-    Food: '🍕', Drinks: '🥤', Equipment: '🔧',
-    Decorations: '🎨', Games: '🎮', Transport: '🚗',
-    Logistics: '📋', Tasks: '✅',
-  };
-  return map[cat] ?? '📦';
-}
