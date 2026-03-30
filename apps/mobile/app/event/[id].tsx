@@ -382,21 +382,13 @@ export default function EventDetailScreen() {
             </View>
 
             {members && members.length > 0 && (
-              isAdmin ? (
-                <TouchableOpacity onPress={() => setShowMembers(true)} activeOpacity={0.8}>
-                  <AvatarGroup
-                    users={members.map((m) => m.user).filter(Boolean) as Array<{ id: string; name: string; avatar_url: string | null }>}
-                    maxVisible={4}
-                    size={32}
-                  />
-                </TouchableOpacity>
-              ) : (
+              <TouchableOpacity onPress={() => setShowMembers(true)} activeOpacity={0.8}>
                 <AvatarGroup
                   users={members.map((m) => m.user).filter(Boolean) as Array<{ id: string; name: string; avatar_url: string | null }>}
                   maxVisible={4}
                   size={32}
                 />
-              )
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -505,12 +497,13 @@ export default function EventDetailScreen() {
           onClose={() => setCommentItemId(null)}
         />
       )}
-      {showMembers && isAdmin && (
+      {showMembers && (
         <MembersModal
           members={members ?? []}
           adminId={event.admin_id}
           currentUserId={user?.id ?? ''}
           eventId={id!}
+          isAdmin={isAdmin}
           onClose={() => setShowMembers(false)}
           onRoleChange={async (memberId, role) => {
             try {
@@ -716,11 +709,30 @@ function CommentsModal({
   );
 }
 
+function RsvpCount({ label, count, color, bg }: { label: string; count: number; color: string; bg: string }) {
+  return (
+    <View className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5" style={{ backgroundColor: bg }}>
+      <Text className="text-xs font-semibold" style={{ color, fontFamily: 'Inter-SemiBold' }}>{count}</Text>
+      <Text className="text-xs" style={{ color, fontFamily: 'Inter-Regular' }}>{label}</Text>
+    </View>
+  );
+}
+
+function rsvpBadge(status: string | null): { label: string; bg: string; text: string } {
+  switch (status) {
+    case 'going':    return { label: '✅ Going',     bg: '#ECFDF5', text: '#059669' };
+    case 'maybe':   return { label: '🤔 Maybe',    bg: '#FFFBEB', text: '#D97706' };
+    case 'not_going': return { label: '❌ Can\'t go', bg: '#FEF2F2', text: '#DC2626' };
+    default:         return { label: '⏳ Pending',  bg: '#F3F4F6', text: '#6B7280' };
+  }
+}
+
 function MembersModal({
   members,
   adminId,
   currentUserId,
   eventId,
+  isAdmin,
   onClose,
   onRoleChange,
 }: {
@@ -728,13 +740,17 @@ function MembersModal({
   adminId: string;
   currentUserId: string;
   eventId: string;
+  isAdmin: boolean;
   onClose: () => void;
   onRoleChange: (memberId: string, role: 'admin' | 'guest') => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<string | null>(null);
-
-  // eventId param reserved for future direct use
   void eventId;
+
+  const going    = members.filter((m) => m.rsvp_status === 'going').length;
+  const maybe    = members.filter((m) => m.rsvp_status === 'maybe').length;
+  const notGoing = members.filter((m) => m.rsvp_status === 'not_going').length;
+  const pending  = members.length - going - maybe - notGoing;
 
   const handleToggleRole = async (member: EventMember) => {
     if (member.user_id === currentUserId) return;
@@ -760,11 +776,11 @@ function MembersModal({
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-black/40 justify-end">
-        <View className="bg-warmwhite rounded-t-3xl" style={{ maxHeight: '70%' }}>
+        <View className="bg-warmwhite rounded-t-3xl" style={{ maxHeight: '80%' }}>
           <View className="items-center pt-3 pb-2">
             <View className="w-10 h-1 bg-charcoal/20 rounded-full" />
           </View>
-          <View className="flex-row items-center justify-between px-5 pb-4">
+          <View className="flex-row items-center justify-between px-5 pb-3">
             <Text className="text-charcoal text-lg" style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}>
               Members ({members.length})
             </Text>
@@ -772,13 +788,23 @@ function MembersModal({
               <Ionicons name="close" size={16} color="#1A1A2E" />
             </TouchableOpacity>
           </View>
-          <ScrollView className="px-5" style={{ maxHeight: 400 }}>
+
+          {/* RSVP summary row */}
+          <View className="flex-row gap-2 px-5 pb-4">
+            {going > 0    && <RsvpCount label="Going"    count={going}    color="#059669" bg="#ECFDF5" />}
+            {maybe > 0    && <RsvpCount label="Maybe"    count={maybe}    color="#D97706" bg="#FFFBEB" />}
+            {notGoing > 0 && <RsvpCount label="Can't go" count={notGoing} color="#DC2626" bg="#FEF2F2" />}
+            {pending > 0  && <RsvpCount label="Pending"  count={pending}  color="#6B7280" bg="#F3F4F6" />}
+          </View>
+
+          <ScrollView className="px-5" style={{ maxHeight: 380 }}>
             <View className="gap-3 pb-6">
               {members.map((member) => {
                 const isEventAdmin = member.user_id === adminId;
                 const isCurrentUser = member.user_id === currentUserId;
                 const isCoHost = member.role === 'admin' && !isEventAdmin;
                 const isUpdating = updating === member.id;
+                const badge = rsvpBadge(member.rsvp_status);
                 return (
                   <View key={member.id} className="flex-row items-center gap-3">
                     <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center shrink-0">
@@ -794,19 +820,28 @@ function MembersModal({
                         {isEventAdmin ? '👑 Host' : isCoHost ? '🤝 Co-host' : 'Guest'}
                       </Text>
                     </View>
-                    {!isEventAdmin && !isCurrentUser && (
+                    {/* RSVP badge */}
+                    <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: badge.bg }}>
+                      <Text className="text-xs" style={{ fontFamily: 'Inter-Medium', color: badge.text }}>
+                        {badge.label}
+                      </Text>
+                    </View>
+                    {/* Promote/demote — admin only, not for yourself or the host */}
+                    {isAdmin && !isEventAdmin && !isCurrentUser && (
                       <TouchableOpacity
                         onPress={() => handleToggleRole(member)}
                         disabled={isUpdating}
-                        className="px-3 py-1.5 rounded-full border border-charcoal/15"
+                        className="w-8 h-8 rounded-full bg-charcoal/6 items-center justify-center"
                         style={{ opacity: isUpdating ? 0.5 : 1 }}
                       >
                         {isUpdating ? (
                           <ActivityIndicator size="small" color="#FF6B4A" />
                         ) : (
-                          <Text className="text-charcoal/60 text-xs" style={{ fontFamily: 'Inter-Medium' }}>
-                            {isCoHost ? 'Remove co-host' : 'Make co-host'}
-                          </Text>
+                          <Ionicons
+                            name={isCoHost ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'}
+                            size={16}
+                            color="#9999B8"
+                          />
                         )}
                       </TouchableOpacity>
                     )}
