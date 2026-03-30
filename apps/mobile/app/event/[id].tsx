@@ -289,6 +289,12 @@ export default function EventDetailScreen() {
               {isAdmin && (
                 <>
                   <TouchableOpacity
+                    onPress={() => router.push(`/event/${id}/dashboard`)}
+                    className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
+                  >
+                    <Ionicons name="bar-chart-outline" size={20} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     onPress={handleClone}
                     className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
                   >

@@ -149,6 +149,7 @@ export default function RootLayout() {
               name="event/[id]/items"
               options={{ presentation: 'modal' }}
             />
+            <Stack.Screen name="event/[id]/dashboard" />
             <Stack.Screen
               name="invite/[token]"
               options={{ presentation: 'modal' }}
