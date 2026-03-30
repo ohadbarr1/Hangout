@@ -125,9 +125,30 @@ router.delete('/:id/unclaim', requireAuth, async (req, res) => {
     return;
   }
 
+  // Allow unclaim if it's your own, or if you're admin/moderator
   if (assignment.user_id !== userId) {
-    res.status(403).json({ data: null, error: { message: 'You can only unclaim your own assignments', code: 'FORBIDDEN' } });
-    return;
+    const { data: item } = await supabase
+      .from('items')
+      .select('event_id')
+      .eq('id', itemId)
+      .single();
+
+    if (!item) {
+      res.status(404).json({ data: null, error: { message: 'Item not found', code: 'NOT_FOUND' } });
+      return;
+    }
+
+    const { data: membership } = await supabase
+      .from('event_members')
+      .select('role')
+      .eq('event_id', item.event_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (membership?.role !== 'admin' && membership?.role !== 'moderator') {
+      res.status(403).json({ data: null, error: { message: 'You can only unclaim your own assignments', code: 'FORBIDDEN' } });
+      return;
+    }
   }
 
   // Fetch item name + event_id for activity log

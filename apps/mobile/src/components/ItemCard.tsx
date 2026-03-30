@@ -14,6 +14,8 @@ interface ItemCardProps {
   preview?: boolean;
   /** Admin mode — shows delete button */
   adminMode?: boolean;
+  /** Admin/mod can unclaim on behalf of others */
+  canManage?: boolean;
 }
 
 export const ItemCard = React.memo(function ItemCard({
@@ -25,6 +27,7 @@ export const ItemCard = React.memo(function ItemCard({
   onPress,
   preview = false,
   adminMode = false,
+  canManage = false,
 }: ItemCardProps) {
   const isClaimed = item.assignment != null;
   const isClaimedByMe = item.assignment?.user_id === currentUserId;
@@ -130,7 +133,7 @@ export const ItemCard = React.memo(function ItemCard({
               </Text>
             </TouchableOpacity>
           )}
-          {isClaimedByMe && (
+          {(isClaimedByMe || (isClaimed && canManage)) && (
             <TouchableOpacity
               onPress={onUnclaim}
               className="bg-charcoal/5 rounded-xl px-3 py-2 ml-2"
@@ -140,7 +143,7 @@ export const ItemCard = React.memo(function ItemCard({
                 className="text-charcoal/50 text-xs"
                 style={{ fontFamily: 'Inter-Medium' }}
               >
-                Unclaim
+                {isClaimedByMe ? 'Unclaim' : 'Remove'}
               </Text>
             </TouchableOpacity>
           )}

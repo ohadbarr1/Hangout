@@ -470,6 +470,7 @@ export default function EventDetailScreen() {
                       key={item.id}
                       item={item}
                       currentUserId={user?.id}
+                      canManage={isAdminOrMod}
                       onClaim={() => claimMutation.mutate({ itemId: item.id })}
                       onUnclaim={() => unclaimMutation.mutate({ itemId: item.id })}
                       onPress={() => setCommentItemId(item.id)}
