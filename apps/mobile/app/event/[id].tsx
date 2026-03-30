@@ -85,6 +85,8 @@ export default function EventDetailScreen() {
   const claimedCount = items?.filter((i) => i.assignment != null).length ?? 0;
   const totalCount = items?.length ?? 0;
   const isAdmin = event?.admin_id === user?.id;
+  const isModerator = myMembership?.role === 'moderator';
+  const isAdminOrMod = isAdmin || isModerator;
 
   const shareInvite = async () => {
     if (!event) return;
@@ -286,7 +288,7 @@ export default function EventDetailScreen() {
                   Invite
                 </Text>
               </TouchableOpacity>
-              {isAdmin && (
+              {isAdminOrMod && (
                 <>
                   <TouchableOpacity
                     onPress={() => router.push(`/event/${id}/dashboard`)}
@@ -294,6 +296,16 @@ export default function EventDetailScreen() {
                   >
                     <Ionicons name="bar-chart-outline" size={20} color="#fff" />
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/event/${id}/items`)}
+                    className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
+                  >
+                    <Ionicons name="settings-outline" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </>
+              )}
+              {isAdmin && (
+                <>
                   <TouchableOpacity
                     onPress={handleClone}
                     className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
@@ -305,12 +317,6 @@ export default function EventDetailScreen() {
                     className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
                   >
                     <Ionicons name="create-outline" size={20} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/event/${id}/items`)}
-                    className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
-                  >
-                    <Ionicons name="settings-outline" size={20} color="#fff" />
                   </TouchableOpacity>
                 </>
               )}
@@ -507,7 +513,7 @@ export default function EventDetailScreen() {
           onClose={() => setShowMembers(false)}
           onRoleChange={async (memberId, role) => {
             try {
-              await apiClient.updateMemberRole(id!, memberId, role);
+              await apiClient.updateMemberRole(id!, memberId, role as 'admin' | 'moderator' | 'guest');
               queryClient.invalidateQueries({ queryKey: ['event-members', id] });
             } catch (err) {
               showAlert('Error', 'Failed to update role.');
@@ -742,7 +748,7 @@ function MembersModal({
   eventId: string;
   isAdmin: boolean;
   onClose: () => void;
-  onRoleChange: (memberId: string, role: 'admin' | 'guest') => Promise<void>;
+  onRoleChange: (memberId: string, role: 'admin' | 'moderator' | 'guest') => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<string | null>(null);
   void eventId;
@@ -752,25 +758,25 @@ function MembersModal({
   const notGoing = members.filter((m) => m.rsvp_status === 'not_going').length;
   const pending  = members.length - going - maybe - notGoing;
 
-  const handleToggleRole = async (member: EventMember) => {
+  const handleToggleRole = async (member: EventMember, nextRole: 'admin' | 'moderator' | 'guest', nextLabel: string) => {
     if (member.user_id === currentUserId) return;
-    const newRole = member.role === 'admin' ? 'guest' : 'admin';
     const name = member.user?.name ?? 'this member';
-    showAlert(
-      newRole === 'admin' ? 'Promote to co-host?' : 'Remove co-host?',
-      `${name} will ${newRole === 'admin' ? 'be able to edit the event and manage items' : 'become a regular guest'}.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: newRole === 'admin' ? 'Promote' : 'Remove',
-          onPress: async () => {
-            setUpdating(member.id);
-            await onRoleChange(member.id, newRole);
-            setUpdating(null);
-          },
+    const descriptions: Record<string, string> = {
+      admin: `${name} will become a co-host and can edit the event.`,
+      moderator: `${name} will become a moderator and can manage items.`,
+      guest: `${name} will become a regular guest.`,
+    };
+    showAlert(nextLabel, descriptions[nextRole] ?? '', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm',
+        onPress: async () => {
+          setUpdating(member.id);
+          await onRoleChange(member.id, nextRole);
+          setUpdating(null);
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -802,9 +808,14 @@ function MembersModal({
               {members.map((member) => {
                 const isEventAdmin = member.user_id === adminId;
                 const isCurrentUser = member.user_id === currentUserId;
+                const isMod = member.role === 'moderator';
                 const isCoHost = member.role === 'admin' && !isEventAdmin;
                 const isUpdating = updating === member.id;
                 const badge = rsvpBadge(member.rsvp_status);
+                const roleLabel = isEventAdmin ? '👑 Host' : isCoHost ? '🤝 Co-host' : isMod ? '🛡️ Moderator' : 'Guest';
+                // Next role in cycle: guest→moderator→co-host→guest
+                const nextRole = member.role === 'guest' ? 'moderator' : member.role === 'moderator' ? 'admin' : 'guest';
+                const nextLabel = nextRole === 'moderator' ? 'Make moderator' : nextRole === 'admin' ? 'Make co-host' : 'Remove role';
                 return (
                   <View key={member.id} className="flex-row items-center gap-3">
                     <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center shrink-0">
@@ -817,7 +828,7 @@ function MembersModal({
                         {member.user?.name ?? 'Unknown'}{isCurrentUser ? ' (you)' : ''}
                       </Text>
                       <Text className="text-charcoal/40 text-xs" style={{ fontFamily: 'Inter-Regular' }}>
-                        {isEventAdmin ? '👑 Host' : isCoHost ? '🤝 Co-host' : 'Guest'}
+                        {roleLabel}
                       </Text>
                     </View>
                     {/* RSVP badge */}
@@ -826,10 +837,10 @@ function MembersModal({
                         {badge.label}
                       </Text>
                     </View>
-                    {/* Promote/demote — admin only, not for yourself or the host */}
+                    {/* Role cycle — admin only, not for yourself or the host */}
                     {isAdmin && !isEventAdmin && !isCurrentUser && (
                       <TouchableOpacity
-                        onPress={() => handleToggleRole(member)}
+                        onPress={() => handleToggleRole(member, nextRole, nextLabel)}
                         disabled={isUpdating}
                         className="w-8 h-8 rounded-full bg-charcoal/6 items-center justify-center"
                         style={{ opacity: isUpdating ? 0.5 : 1 }}
@@ -838,7 +849,7 @@ function MembersModal({
                           <ActivityIndicator size="small" color="#FF6B4A" />
                         ) : (
                           <Ionicons
-                            name={isCoHost ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'}
+                            name={nextRole === 'guest' ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'}
                             size={16}
                             color="#9999B8"
                           />

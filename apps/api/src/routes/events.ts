@@ -385,7 +385,7 @@ router.post('/:id/clone', requireAuth, async (req, res) => {
 // ─── PATCH /events/:id/members/:memberId — promote/demote co-host (4.4) ──────
 
 router.patch('/:id/members/:memberId', requireAuth, validateBody(z.object({
-  role: z.enum(['admin', 'guest']),
+  role: z.enum(['admin', 'moderator', 'guest']),
 })), async (req, res) => {
   const { userId } = req as AuthenticatedRequest;
   const { id, memberId } = req.params;

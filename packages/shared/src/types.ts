@@ -32,6 +32,7 @@ export enum RsvpStatus {
 
 export enum MemberRole {
   Admin = 'admin',
+  Moderator = 'moderator',
   Guest = 'guest',
 }
 

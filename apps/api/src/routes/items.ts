@@ -41,7 +41,12 @@ async function getMembership(eventId: string, userId: string) {
     .eq('event_id', eventId)
     .eq('user_id', userId)
     .maybeSingle();
-  return data as { role: 'admin' | 'guest' } | null;
+  return data as { role: 'admin' | 'moderator' | 'guest' } | null;
+}
+
+async function isAdminOrMod(eventId: string, userId: string): Promise<boolean> {
+  const m = await getMembership(eventId, userId);
+  return m?.role === 'admin' || m?.role === 'moderator';
 }
 
 // ─── GET /events/:eventId/items ───────────────────────────────────────────────
@@ -120,9 +125,8 @@ router.patch('/:id', requireAuth, validateBody(updateItemSchema), async (req, re
     return;
   }
 
-  const adminId = (item.events as unknown as { admin_id: string } | null)?.admin_id;
-  if (adminId !== userId) {
-    res.status(403).json({ data: null, error: { message: 'Only the event admin can update items', code: 'FORBIDDEN' } });
+  if (!await isAdminOrMod(item.event_id, userId)) {
+    res.status(403).json({ data: null, error: { message: 'Only admins and moderators can update items', code: 'FORBIDDEN' } });
     return;
   }
 
@@ -158,9 +162,8 @@ router.delete('/:id', requireAuth, async (req, res) => {
     return;
   }
 
-  const adminId = (item.events as unknown as { admin_id: string } | null)?.admin_id;
-  if (adminId !== userId) {
-    res.status(403).json({ data: null, error: { message: 'Only the event admin can delete items', code: 'FORBIDDEN' } });
+  if (!await isAdminOrMod(item.event_id, userId)) {
+    res.status(403).json({ data: null, error: { message: 'Only admins and moderators can delete items', code: 'FORBIDDEN' } });
     return;
   }
 
