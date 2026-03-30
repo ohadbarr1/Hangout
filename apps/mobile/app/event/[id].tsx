@@ -28,7 +28,7 @@ import { apiClient } from '@/lib/claude';
 import type { ActivityItem } from '@/lib/claude';
 import { showAlert } from '@/components/Toast';
 import { EventDetailHeroSkeleton, ItemCardSkeleton } from '@/components/Skeleton';
-import type { Category } from '@hangout/shared';
+import type { Category, EventMember } from '@hangout/shared';
 import { formatDate } from '@/utils/dateUtils';
 import { categoryEmoji } from '@/utils/categoryUtils';
 
@@ -63,6 +63,8 @@ export default function EventDetailScreen() {
   const { data: members, refetch: refetchMembers } = useEventMembers(id);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [commentItemId, setCommentItemId] = useState<string | null>(null);
+  const [cloning, setCloning] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
 
   const { data: activity } = useQuery({
     queryKey: ['activity', id],
@@ -117,6 +119,20 @@ export default function EventDetailScreen() {
       if (err instanceof Error && err.message !== 'Share was dismissed') {
         showAlert('Error', 'Could not generate invite link. Try again.');
       }
+    }
+  };
+
+  const handleClone = async () => {
+    if (cloning) return;
+    setCloning(true);
+    try {
+      const cloned = await apiClient.cloneEvent(id!);
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      router.replace(`/event/${cloned.id}`);
+    } catch (err) {
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to clone event.');
+    } finally {
+      setCloning(false);
     }
   };
 
@@ -273,6 +289,12 @@ export default function EventDetailScreen() {
               {isAdmin && (
                 <>
                   <TouchableOpacity
+                    onPress={handleClone}
+                    className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
+                  >
+                    {cloning ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="copy-outline" size={20} color="#fff" />}
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     onPress={() => router.push(`/event/${id}/edit`)}
                     className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
                   >
@@ -354,11 +376,21 @@ export default function EventDetailScreen() {
             </View>
 
             {members && members.length > 0 && (
-              <AvatarGroup
-                users={members.map((m) => m.user).filter(Boolean) as Array<{ id: string; name: string; avatar_url: string | null }>}
-                maxVisible={4}
-                size={32}
-              />
+              isAdmin ? (
+                <TouchableOpacity onPress={() => setShowMembers(true)} activeOpacity={0.8}>
+                  <AvatarGroup
+                    users={members.map((m) => m.user).filter(Boolean) as Array<{ id: string; name: string; avatar_url: string | null }>}
+                    maxVisible={4}
+                    size={32}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <AvatarGroup
+                  users={members.map((m) => m.user).filter(Boolean) as Array<{ id: string; name: string; avatar_url: string | null }>}
+                  maxVisible={4}
+                  size={32}
+                />
+              )
             )}
           </View>
         </View>
@@ -465,6 +497,23 @@ export default function EventDetailScreen() {
           itemId={commentItemId}
           currentUserId={user?.id ?? ''}
           onClose={() => setCommentItemId(null)}
+        />
+      )}
+      {showMembers && isAdmin && (
+        <MembersModal
+          members={members ?? []}
+          adminId={event.admin_id}
+          currentUserId={user?.id ?? ''}
+          eventId={id!}
+          onClose={() => setShowMembers(false)}
+          onRoleChange={async (memberId, role) => {
+            try {
+              await apiClient.updateMemberRole(id!, memberId, role);
+              queryClient.invalidateQueries({ queryKey: ['event-members', id] });
+            } catch (err) {
+              showAlert('Error', 'Failed to update role.');
+            }
+          }}
         />
       )}
     </View>
@@ -655,6 +704,111 @@ function CommentsModal({
               )}
             </TouchableOpacity>
           </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function MembersModal({
+  members,
+  adminId,
+  currentUserId,
+  eventId,
+  onClose,
+  onRoleChange,
+}: {
+  members: EventMember[];
+  adminId: string;
+  currentUserId: string;
+  eventId: string;
+  onClose: () => void;
+  onRoleChange: (memberId: string, role: 'admin' | 'guest') => Promise<void>;
+}) {
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  // eventId param reserved for future direct use
+  void eventId;
+
+  const handleToggleRole = async (member: EventMember) => {
+    if (member.user_id === currentUserId) return;
+    const newRole = member.role === 'admin' ? 'guest' : 'admin';
+    const name = member.user?.name ?? 'this member';
+    showAlert(
+      newRole === 'admin' ? 'Promote to co-host?' : 'Remove co-host?',
+      `${name} will ${newRole === 'admin' ? 'be able to edit the event and manage items' : 'become a regular guest'}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: newRole === 'admin' ? 'Promote' : 'Remove',
+          onPress: async () => {
+            setUpdating(member.id);
+            await onRoleChange(member.id, newRole);
+            setUpdating(null);
+          },
+        },
+      ]
+    );
+  };
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 bg-black/40 justify-end">
+        <View className="bg-warmwhite rounded-t-3xl" style={{ maxHeight: '70%' }}>
+          <View className="items-center pt-3 pb-2">
+            <View className="w-10 h-1 bg-charcoal/20 rounded-full" />
+          </View>
+          <View className="flex-row items-center justify-between px-5 pb-4">
+            <Text className="text-charcoal text-lg" style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}>
+              Members ({members.length})
+            </Text>
+            <TouchableOpacity onPress={onClose} className="w-8 h-8 rounded-full bg-charcoal/8 items-center justify-center">
+              <Ionicons name="close" size={16} color="#1A1A2E" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView className="px-5" style={{ maxHeight: 400 }}>
+            <View className="gap-3 pb-6">
+              {members.map((member) => {
+                const isEventAdmin = member.user_id === adminId;
+                const isCurrentUser = member.user_id === currentUserId;
+                const isCoHost = member.role === 'admin' && !isEventAdmin;
+                const isUpdating = updating === member.id;
+                return (
+                  <View key={member.id} className="flex-row items-center gap-3">
+                    <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center shrink-0">
+                      <Text className="text-primary text-sm" style={{ fontFamily: 'PlusJakartaSans-Bold' }}>
+                        {member.user?.name?.charAt(0).toUpperCase() ?? '?'}
+                      </Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-charcoal text-sm" style={{ fontFamily: 'Inter-Medium' }}>
+                        {member.user?.name ?? 'Unknown'}{isCurrentUser ? ' (you)' : ''}
+                      </Text>
+                      <Text className="text-charcoal/40 text-xs" style={{ fontFamily: 'Inter-Regular' }}>
+                        {isEventAdmin ? '👑 Host' : isCoHost ? '🤝 Co-host' : 'Guest'}
+                      </Text>
+                    </View>
+                    {!isEventAdmin && !isCurrentUser && (
+                      <TouchableOpacity
+                        onPress={() => handleToggleRole(member)}
+                        disabled={isUpdating}
+                        className="px-3 py-1.5 rounded-full border border-charcoal/15"
+                        style={{ opacity: isUpdating ? 0.5 : 1 }}
+                      >
+                        {isUpdating ? (
+                          <ActivityIndicator size="small" color="#FF6B4A" />
+                        ) : (
+                          <Text className="text-charcoal/60 text-xs" style={{ fontFamily: 'Inter-Medium' }}>
+                            {isCoHost ? 'Remove co-host' : 'Make co-host'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>

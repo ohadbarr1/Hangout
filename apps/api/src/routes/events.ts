@@ -320,6 +320,114 @@ router.delete('/:id', requireAuth, async (req, res) => {
   res.json({ data: { id }, error: null });
 });
 
+// ─── POST /events/:id/clone — duplicate an event (4.5) ───────────────────────
+
+router.post('/:id/clone', requireAuth, async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { id } = req.params;
+
+  // Fetch source event + verify membership
+  const { data: source } = await supabase.from('events').select('*').eq('id', id).single();
+  if (!source) {
+    res.status(404).json({ data: null, error: { message: 'Event not found' } });
+    return;
+  }
+  const { data: membership } = await supabase.from('event_members').select('role').eq('event_id', id).eq('user_id', userId).maybeSingle();
+  if (!membership) {
+    res.status(403).json({ data: null, error: { message: 'Access denied' } });
+    return;
+  }
+
+  // Create cloned event (clear date + status → draft)
+  const { data: cloned, error: cloneError } = await supabase.from('events').insert({
+    admin_id: userId,
+    title: `${source.title} (copy)`,
+    description: source.description,
+    location: source.location,
+    hero_color: source.hero_color,
+    event_date: null,
+    status: 'draft',
+    invite_code: generateInviteCode(),
+  }).select().single();
+
+  if (cloneError || !cloned) {
+    res.status(500).json({ data: null, error: { message: cloneError?.message ?? 'Failed to clone event' } });
+    return;
+  }
+
+  // Add creator as admin member
+  await supabase.from('event_members').insert({
+    event_id: cloned.id,
+    user_id: userId,
+    role: 'admin',
+    rsvp_status: 'going',
+  });
+
+  // Clone items (clear assignments)
+  const { data: sourceItems } = await supabase.from('items').select('*').eq('event_id', id);
+  if (sourceItems && sourceItems.length > 0) {
+    await supabase.from('items').insert(
+      sourceItems.map((item) => ({
+        event_id: cloned.id,
+        category: item.category,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        notes: item.notes,
+        is_ai_generated: item.is_ai_generated,
+      }))
+    );
+  }
+
+  res.status(201).json({ data: cloned, error: null });
+});
+
+// ─── PATCH /events/:id/members/:memberId — promote/demote co-host (4.4) ──────
+
+router.patch('/:id/members/:memberId', requireAuth, validateBody(z.object({
+  role: z.enum(['admin', 'guest']),
+})), async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { id, memberId } = req.params;
+
+  // Only event admin can promote/demote
+  const { data: event } = await supabase.from('events').select('admin_id').eq('id', id).single();
+  if (!event) {
+    res.status(404).json({ data: null, error: { message: 'Event not found' } });
+    return;
+  }
+  if (event.admin_id !== userId) {
+    res.status(403).json({ data: null, error: { message: 'Only the event admin can change member roles' } });
+    return;
+  }
+
+  // Cannot change the admin's own role
+  const { data: targetMember } = await supabase.from('event_members').select('user_id').eq('id', memberId).single();
+  if (!targetMember) {
+    res.status(404).json({ data: null, error: { message: 'Member not found' } });
+    return;
+  }
+  if (targetMember.user_id === userId) {
+    res.status(400).json({ data: null, error: { message: 'Cannot change your own role' } });
+    return;
+  }
+
+  const { data: updated, error } = await supabase
+    .from('event_members')
+    .update({ role: req.body.role })
+    .eq('id', memberId)
+    .eq('event_id', id)
+    .select()
+    .single();
+
+  if (error) {
+    res.status(500).json({ data: null, error: { message: error.message } });
+    return;
+  }
+
+  res.json({ data: updated, error: null });
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateInviteCode(): string {

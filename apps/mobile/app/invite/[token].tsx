@@ -143,12 +143,20 @@ export default function InviteScreen() {
           <>
             {/* Invite preview card */}
             <View className="w-full bg-white rounded-3xl p-6 shadow-sm shadow-charcoal/10 mb-8">
-              <View
-                className="w-16 h-16 rounded-2xl items-center justify-center mb-5 self-center"
-                style={{ backgroundColor: '#FF6B4A' }}
-              >
-                <Text className="text-3xl">🎉</Text>
-              </View>
+              {(() => {
+                const HERO_COLORS: Record<string, string> = {
+                  coral: '#FF6B4A', violet: '#7B61FF', mint: '#06D6A0', golden: '#FFD166', charcoal: '#2E2E50',
+                };
+                const heroColor = HERO_COLORS[(invite.event as any)?.hero_color] ?? '#FF6B4A';
+                return (
+                  <View
+                    className="w-16 h-16 rounded-2xl items-center justify-center mb-5 self-center"
+                    style={{ backgroundColor: heroColor }}
+                  >
+                    <Text className="text-3xl">🎉</Text>
+                  </View>
+                );
+              })()}
 
               <Text
                 className="text-charcoal/50 text-sm text-center mb-2"
@@ -187,6 +195,24 @@ export default function InviteScreen() {
                       style={{ fontFamily: 'Inter-Regular' }}
                     >
                       {invite.event.location}
+                    </Text>
+                  </View>
+                )}
+                {/* Member count */}
+                {(invite.event as any).member_count > 0 && (
+                  <View className="flex-row items-center gap-3">
+                    <Ionicons name="people-outline" size={16} color="#9999B8" />
+                    <Text className="text-charcoal/70 text-sm" style={{ fontFamily: 'Inter-Regular' }}>
+                      {(invite.event as any).member_count} {(invite.event as any).member_count === 1 ? 'person' : 'people'} going
+                    </Text>
+                  </View>
+                )}
+                {/* Item count */}
+                {(invite.event as any).item_count > 0 && (
+                  <View className="flex-row items-center gap-3">
+                    <Ionicons name="bag-outline" size={16} color="#9999B8" />
+                    <Text className="text-charcoal/70 text-sm" style={{ fontFamily: 'Inter-Regular' }}>
+                      {(invite.event as any).item_count} items to claim
                     </Text>
                   </View>
                 )}

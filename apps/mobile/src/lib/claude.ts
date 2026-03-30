@@ -166,4 +166,16 @@ export const apiClient = {
 
   addComment: (itemId: string, text: string): Promise<ItemComment> =>
     request('POST', `/items/${itemId}/comments`, { text }),
+
+  // ─── Clone event ──────────────────────────────────────────────────────────
+
+  // Clone an event (returns new event)
+  cloneEvent: (eventId: string): Promise<Event> =>
+    request('POST', `/events/${eventId}/clone`, {}),
+
+  // ─── Member role ──────────────────────────────────────────────────────────
+
+  // Update member role (promote to co-host or demote)
+  updateMemberRole: (eventId: string, memberId: string, role: 'admin' | 'guest'): Promise<EventMember> =>
+    request('PATCH', `/events/${eventId}/members/${memberId}`, { role }),
 };

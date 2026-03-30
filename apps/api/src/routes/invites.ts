@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
+import satori from 'satori';
 
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
@@ -71,7 +72,7 @@ router.get('/invites/:token', async (req, res) => {
 
   const { data: invite, error } = await supabase
     .from('invites')
-    .select('*, event:events(id, title, event_date, location, status)')
+    .select('*, event:events(id, title, event_date, location, status, hero_color)')
     .eq('token', token)
     .maybeSingle();
 
@@ -93,7 +94,121 @@ router.get('/invites/:token', async (req, res) => {
     return;
   }
 
-  res.json({ data: invite, error: null });
+  const eventId = (invite.event as { id: string } | null)?.id ?? invite.event_id;
+
+  const [{ count: memberCount }, { count: itemCount }] = await Promise.all([
+    supabase.from('event_members').select('id', { count: 'exact', head: true }).eq('event_id', eventId),
+    supabase.from('items').select('id', { count: 'exact', head: true }).eq('event_id', eventId),
+  ]);
+
+  res.json({
+    data: {
+      ...invite,
+      event: {
+        ...(invite.event as object),
+        member_count: memberCount ?? 0,
+        item_count: itemCount ?? 0,
+      },
+    },
+    error: null,
+  });
+});
+
+// ─── GET /invites/:token/og-image — social preview SVG ───────────────────────
+
+router.get('/invites/:token/og-image', async (req, res) => {
+  const { token } = req.params;
+
+  const { data: invite } = await supabase
+    .from('invites')
+    .select('*, event:events(id, title, event_date, location, hero_color, status)')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (!invite?.event) {
+    res.status(404).send('Not found');
+    return;
+  }
+
+  const event = invite.event as { title: string; event_date: string | null; location: string | null; hero_color: string; status: string };
+
+  const HERO_COLORS: Record<string, string> = {
+    coral: '#FF6B4A', violet: '#7B61FF', mint: '#06D6A0',
+    golden: '#FFD166', charcoal: '#2E2E50',
+  };
+  const bgColor = HERO_COLORS[event.hero_color] ?? HERO_COLORS.coral;
+
+  const dateStr = event.event_date
+    ? new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    : null;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const element = {
+      type: 'div',
+      props: {
+        style: {
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: bgColor,
+          padding: '60px',
+        },
+        children: [
+          {
+            type: 'div',
+            props: {
+              style: { fontSize: 28, color: 'rgba(255,255,255,0.8)', marginBottom: 16, fontFamily: 'sans-serif' },
+              children: "You're invited to",
+            },
+          },
+          {
+            type: 'div',
+            props: {
+              style: { fontSize: 64, fontWeight: 'bold', color: '#ffffff', textAlign: 'center', lineHeight: 1.2, fontFamily: 'sans-serif' },
+              children: event.title,
+            },
+          },
+          ...(dateStr ? [{
+            type: 'div',
+            props: {
+              style: { fontSize: 28, color: 'rgba(255,255,255,0.85)', marginTop: 24, fontFamily: 'sans-serif' },
+              children: `📅 ${dateStr}`,
+            },
+          }] : []),
+          {
+            type: 'div',
+            props: {
+              style: { fontSize: 22, color: 'rgba(255,255,255,0.6)', marginTop: 32, fontFamily: 'sans-serif' },
+              children: 'hangout.app',
+            },
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof satori>[0];
+
+    const svg = await satori(element, {
+      width: 1200,
+      height: 630,
+      fonts: [],
+    });
+
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(svg);
+  } catch (err) {
+    // Fallback: return a simple colored SVG
+    const fallback = `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+      <rect width="1200" height="630" fill="${bgColor}"/>
+      <text x="600" y="280" font-size="64" fill="white" text-anchor="middle" font-family="sans-serif" font-weight="bold">${event.title.replace(/[<>&"]/g, '')}</text>
+      <text x="600" y="380" font-size="28" fill="rgba(255,255,255,0.7)" text-anchor="middle" font-family="sans-serif">You're invited</text>
+    </svg>`;
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.send(fallback);
+  }
 });
 
 // ─── POST /invites/:token/accept — join an event via invite ──────────────────
