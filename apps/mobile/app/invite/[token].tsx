@@ -47,7 +47,6 @@ export default function InviteScreen() {
 
   const handleAccept = async () => {
     if (!session) {
-      // Store invite token so _layout.tsx can redirect back after auth
       setPendingInviteToken(token);
       router.replace(`/(auth)/welcome`);
       return;
@@ -56,6 +55,21 @@ export default function InviteScreen() {
     setState('joining');
     try {
       await apiClient.acceptInvite(token, { rsvp_status: RsvpStatus.Going });
+      if (invite?.event_id) {
+        router.replace(`/event/${invite.event_id}`);
+      } else {
+        router.replace('/(tabs)/');
+      }
+    } catch (err) {
+      setState('preview');
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to join event.');
+    }
+  };
+
+  const handleMaybe = async () => {
+    setState('joining');
+    try {
+      await apiClient.acceptInvite(token, { rsvp_status: RsvpStatus.Maybe });
       if (invite?.event_id) {
         router.replace(`/event/${invite.event_id}`);
       } else {
@@ -104,13 +118,15 @@ export default function InviteScreen() {
               className="text-charcoal text-xl text-center mb-3"
               style={{ fontFamily: 'PlusJakartaSans-Bold' }}
             >
-              Invite not found
+              {errorMessage.toLowerCase().includes('expir') ? 'This invite has expired' : 'Invite not found'}
             </Text>
             <Text
               className="text-charcoal/50 text-base text-center mb-8 leading-6"
               style={{ fontFamily: 'Inter-Regular' }}
             >
-              {errorMessage}
+              {errorMessage.toLowerCase().includes('expir')
+                ? 'Ask the organizer to send a new invite link.'
+                : 'This link may be invalid or the event no longer exists.'}
             </Text>
             <TouchableOpacity
               onPress={() => router.replace('/(tabs)/')}
@@ -203,6 +219,19 @@ export default function InviteScreen() {
                 </Text>
               )}
             </TouchableOpacity>
+
+            {session && (
+              <TouchableOpacity
+                onPress={handleMaybe}
+                disabled={state === 'joining'}
+                className="w-full border border-charcoal/15 rounded-2xl py-4 items-center mt-3"
+                activeOpacity={0.75}
+              >
+                <Text className="text-charcoal/60 text-base" style={{ fontFamily: 'Inter-Regular' }}>
+                  Maybe — I'll let you know
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               onPress={() => router.replace('/(tabs)/')}

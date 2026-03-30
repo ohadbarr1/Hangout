@@ -4,7 +4,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +14,10 @@ import { useMyEventsWithCounts } from '@/hooks/useEvent';
 import type { EventWithCounts } from '@/hooks/useEvent';
 import { EventCard } from '@/components/EventCard';
 import { formatDate } from '@/utils/dateUtils';
+import {
+  EventCardSkeleton,
+  NextHangoutCardSkeleton,
+} from '@/components/Skeleton';
 
 const HERO_COLORS: Record<string, string> = {
   coral: '#FF6B4A',
@@ -118,11 +121,29 @@ export default function HomeScreen() {
         }
       >
         {isLoading ? (
-          <View className="items-center justify-center pt-20">
-            <ActivityIndicator color="#FF6B4A" size="large" />
+          <View className="pt-6 gap-6">
+            {/* Hero card skeleton */}
+            <View>
+              <View
+                className="bg-charcoal/10 rounded-lg mb-3"
+                style={{ width: 160, height: 14 }}
+              />
+              <NextHangoutCardSkeleton />
+            </View>
+            {/* "Needs your attention" section skeleton */}
+            <View>
+              <View
+                className="bg-charcoal/10 rounded-lg mb-3"
+                style={{ width: 190, height: 14 }}
+              />
+              <View className="gap-3">
+                <EventCardSkeleton />
+                <EventCardSkeleton />
+              </View>
+            </View>
           </View>
         ) : allEvents.length === 0 ? (
-          <EmptyState onCreatePress={() => router.push('/event/create')} />
+          <EmptyState onCreatePress={(example?: string) => router.push({ pathname: '/event/create', params: example ? { prefill: example } : {} })} />
         ) : (
           <>
             {/* Your next hangout */}
@@ -260,31 +281,49 @@ function NextHangoutCard({
   );
 }
 
-function EmptyState({ onCreatePress }: { onCreatePress: () => void }) {
+function EmptyState({ onCreatePress }: { onCreatePress: (example?: string) => void }) {
+  const examples = [
+    'BBQ for 10 people this Saturday 🔥',
+    'Game night at mine next Friday 🎮',
+    'Beach trip for 8, leaving at 9am 🏖️',
+  ];
+
   return (
-    <View className="items-center justify-center pt-20 px-8">
-      <Text className="text-5xl mb-6">🎉</Text>
-      <Text
-        className="text-charcoal text-xl text-center mb-3"
-        style={{ fontFamily: 'PlusJakartaSans-Bold' }}
-      >
+    <View className="items-center justify-center pt-16 px-6">
+      <Text className="text-5xl mb-5">🎉</Text>
+      <Text className="text-charcoal text-xl text-center mb-2" style={{ fontFamily: 'PlusJakartaSans-Bold' }}>
         No hangouts yet
       </Text>
-      <Text
-        className="text-charcoal/60 text-base text-center mb-8 leading-6"
-        style={{ fontFamily: 'Inter-Regular' }}
-      >
-        Describe your first event and let AI plan everything — what to bring, who brings what.
+      <Text className="text-charcoal/55 text-sm text-center mb-8 leading-6" style={{ fontFamily: 'Inter-Regular' }}>
+        Describe your event and let AI plan everything — who brings what, how much, when.
       </Text>
+
+      {/* Example prompt chips */}
+      <Text className="text-charcoal/40 text-xs mb-3 self-start" style={{ fontFamily: 'Inter-Medium' }}>
+        TRY AN EXAMPLE
+      </Text>
+      <View className="w-full gap-2 mb-8">
+        {examples.map((ex) => (
+          <TouchableOpacity
+            key={ex}
+            onPress={() => onCreatePress(ex)}
+            className="bg-white border border-charcoal/8 rounded-2xl px-4 py-3.5 flex-row items-center justify-between"
+            activeOpacity={0.75}
+          >
+            <Text className="text-charcoal/70 text-sm flex-1" style={{ fontFamily: 'Inter-Regular' }}>
+              {ex}
+            </Text>
+            <Ionicons name="arrow-forward-circle-outline" size={18} color="#FF6B4A" />
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <TouchableOpacity
-        onPress={onCreatePress}
-        className="bg-primary rounded-2xl px-8 py-4"
+        onPress={() => onCreatePress()}
+        className="bg-primary rounded-2xl px-8 py-4 w-full items-center"
         activeOpacity={0.85}
       >
-        <Text
-          className="text-white text-base"
-          style={{ fontFamily: 'Inter-SemiBold' }}
-        >
+        <Text className="text-white text-base" style={{ fontFamily: 'Inter-SemiBold' }}>
           Plan a hangout
         </Text>
       </TouchableOpacity>

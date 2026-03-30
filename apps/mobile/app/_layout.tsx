@@ -10,6 +10,7 @@ import '../global.css';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ToastProviderWithRef } from '@/components/Toast';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -101,31 +102,33 @@ export default function RootLayout() {
     <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <StatusBar style="auto" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen
-            name="event/create"
-            options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen name="event/[id]" />
-          <Stack.Screen
-            name="event/[id]/edit"
-            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-          />
-          <Stack.Screen
-            name="event/[id]/items"
-            options={{ presentation: 'modal' }}
-          />
-          <Stack.Screen
-            name="invite/[token]"
-            options={{ presentation: 'modal' }}
-          />
-        </Stack>
+        <ToastProviderWithRef>
+          <StatusBar style="auto" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="event/create"
+              options={{
+                presentation: 'modal',
+                animation: 'slide_from_bottom',
+              }}
+            />
+            <Stack.Screen name="event/[id]" />
+            <Stack.Screen
+              name="event/[id]/edit"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
+              name="event/[id]/items"
+              options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
+              name="invite/[token]"
+              options={{ presentation: 'modal' }}
+            />
+          </Stack>
+        </ToastProviderWithRef>
       </QueryClientProvider>
     </GestureHandlerRootView>
     </ErrorBoundary>

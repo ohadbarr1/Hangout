@@ -4,7 +4,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Share,
-  ActivityIndicator,
   Platform,
   RefreshControl,
 } from 'react-native';
@@ -13,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { ImpactFeedbackStyle, NotificationFeedbackType } from 'expo-haptics';
 
 import { useEvent, useEventMembers } from '@/hooks/useEvent';
 import { useItems } from '@/hooks/useItems';
@@ -22,9 +23,22 @@ import { AvatarGroup } from '@/components/AvatarGroup';
 import { ItemCard } from '@/components/ItemCard';
 import { apiClient } from '@/lib/claude';
 import { showAlert } from '@/components/Toast';
+import { EventDetailHeroSkeleton, ItemCardSkeleton } from '@/components/Skeleton';
 import type { Category } from '@hangout/shared';
 import { formatDate } from '@/utils/dateUtils';
 import { categoryEmoji } from '@/utils/categoryUtils';
+
+function getCountdown(eventDate: string): string | null {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const target = new Date(eventDate);
+  target.setHours(0, 0, 0, 0);
+  const diff = Math.round((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff <= 0) return null;
+  if (diff === 1) return '🔔 Tomorrow!';
+  if (diff <= 7) return `⏳ ${diff} days to go`;
+  return null;
+}
 
 const HERO_GRADIENTS: Record<string, [string, string]> = {
   coral: ['#FF6B4A', '#FF9472'],
@@ -98,6 +112,9 @@ export default function EventDetailScreen() {
     mutationFn: ({ itemId }: { itemId: string }) =>
       apiClient.claimItem(itemId),
     onMutate: async ({ itemId }) => {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(ImpactFeedbackStyle.Medium).catch(() => {});
+      }
       // Optimistic update
       await queryClient.cancelQueries({ queryKey: ['items', id] });
       const prev = queryClient.getQueryData(['items', id]);
@@ -125,6 +142,9 @@ export default function EventDetailScreen() {
     mutationFn: ({ itemId }: { itemId: string }) =>
       apiClient.unclaimItem(itemId),
     onMutate: async ({ itemId }) => {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(ImpactFeedbackStyle.Light).catch(() => {});
+      }
       await queryClient.cancelQueries({ queryKey: ['items', id] });
       const prev = queryClient.getQueryData(['items', id]);
       queryClient.setQueryData(['items', id], (old: typeof items) =>
@@ -149,6 +169,9 @@ export default function EventDetailScreen() {
       apiClient.updateRsvp(id!, rsvp_status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event-members', id] });
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(NotificationFeedbackType.Success).catch(() => {});
+      }
     },
     onError: () => {
       showAlert('Error', 'Failed to update RSVP. Try again.');
@@ -157,8 +180,13 @@ export default function EventDetailScreen() {
 
   if (eventLoading) {
     return (
-      <View className="flex-1 bg-warmwhite items-center justify-center">
-        <ActivityIndicator color="#FF6B4A" size="large" />
+      <View className="flex-1 bg-warmwhite">
+        <EventDetailHeroSkeleton />
+        <View className="px-5 pt-6 gap-3">
+          <ItemCardSkeleton />
+          <ItemCardSkeleton />
+          <ItemCardSkeleton />
+        </View>
       </View>
     );
   }
@@ -179,6 +207,8 @@ export default function EventDetailScreen() {
   }
 
   const [colorStart] = HERO_GRADIENTS[event.hero_color] ?? HERO_GRADIENTS.coral;
+  const isLightHero = ['mint', 'golden'].includes(event.hero_color);
+  const countdown = event.event_date ? getCountdown(event.event_date) : null;
 
   // Group items by category
   const itemsByCategory = (items ?? []).reduce<Record<string, typeof items>>((acc, item) => {
@@ -250,25 +280,38 @@ export default function EventDetailScreen() {
           {/* Event info */}
           <Text
             className="text-white text-3xl mb-2"
-            style={{ fontFamily: 'PlusJakartaSans-Bold' }}
+            style={[
+              { fontFamily: 'PlusJakartaSans-Bold' },
+              isLightHero && { textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+            ]}
           >
             {event.title}
           </Text>
           {event.description ? (
             <Text
               className="text-white/75 text-sm mb-3 leading-5"
-              style={{ fontFamily: 'Inter-Regular' }}
+              style={[
+                { fontFamily: 'Inter-Regular' },
+                isLightHero && { textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+              ]}
               numberOfLines={3}
             >
               {event.description}
             </Text>
           ) : null}
+          {countdown && (
+            <View className="self-start bg-white/25 rounded-full px-3 py-1 mb-3">
+              <Text className="text-white text-xs" style={{ fontFamily: 'Inter-SemiBold' }}>
+                {countdown}
+              </Text>
+            </View>
+          )}
           <View className="flex-row flex-wrap gap-3 mb-5">
             {event.event_date && (
-              <HeroBadge icon="calendar-outline" label={formatDate(event.event_date)} />
+              <HeroBadge icon="calendar-outline" label={formatDate(event.event_date)} isLight={isLightHero} />
             )}
             {event.location && (
-              <HeroBadge icon="location-outline" label={event.location} />
+              <HeroBadge icon="location-outline" label={event.location} isLight={isLightHero} />
             )}
           </View>
 
@@ -353,8 +396,10 @@ export default function EventDetailScreen() {
         {/* Items by category */}
         <View className="px-5 pt-6">
           {itemsLoading ? (
-            <View className="items-center py-10">
-              <ActivityIndicator color="#FF6B4A" />
+            <View className="gap-3 pb-6">
+              <ItemCardSkeleton />
+              <ItemCardSkeleton />
+              <ItemCardSkeleton />
             </View>
           ) : Object.keys(itemsByCategory).length === 0 ? (
             <View className="items-center py-10">
@@ -391,13 +436,16 @@ export default function EventDetailScreen() {
   );
 }
 
-function HeroBadge({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+function HeroBadge({ icon, label, isLight }: { icon: keyof typeof Ionicons.glyphMap; label: string; isLight?: boolean }) {
   return (
     <View className="flex-row items-center gap-1.5 bg-white/20 rounded-full px-3 py-1.5">
       <Ionicons name={icon} size={12} color="rgba(255,255,255,0.9)" />
       <Text
         className="text-white/90 text-xs"
-        style={{ fontFamily: 'Inter-Medium' }}
+        style={[
+          { fontFamily: 'Inter-Medium' },
+          isLight && { textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+        ]}
       >
         {label}
       </Text>

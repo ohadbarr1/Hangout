@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
   Animated,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
+import * as Haptics from 'expo-haptics';
+import { NotificationFeedbackType } from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -26,9 +28,10 @@ export default function CreateEventScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const inputRef = useRef<TextInput>(null);
+  const { prefill } = useLocalSearchParams<{ prefill?: string }>();
 
   const [step, setStep] = useState<Step>('input');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(prefill ?? '');
   const [parsedEvent, setParsedEvent] = useState<ParsedEventResponse | null>(null);
 
   const parseMutation = useMutation({
@@ -53,6 +56,9 @@ export default function CreateEventScreen() {
     },
     onSuccess: (event) => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(NotificationFeedbackType.Success).catch(() => {});
+      }
       router.replace(`/event/${event.id}`);
     },
     onError: (err) => {
