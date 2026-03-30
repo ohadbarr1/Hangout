@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Item } from '@hangout/shared';
 
@@ -16,6 +16,8 @@ interface ItemCardProps {
   adminMode?: boolean;
   /** Admin/mod can unclaim on behalf of others */
   canManage?: boolean;
+  /** Show loading state on claim/unclaim */
+  isLoading?: boolean;
 }
 
 export const ItemCard = React.memo(function ItemCard({
@@ -28,6 +30,7 @@ export const ItemCard = React.memo(function ItemCard({
   preview = false,
   adminMode = false,
   canManage = false,
+  isLoading = false,
 }: ItemCardProps) {
   const isClaimed = item.assignment != null;
   const isClaimedByMe = item.assignment?.user_id === currentUserId;
@@ -122,29 +125,41 @@ export const ItemCard = React.memo(function ItemCard({
           {!isClaimed && (
             <TouchableOpacity
               onPress={onClaim}
+              disabled={isLoading}
               className="bg-primary/10 rounded-xl px-3 py-2 ml-2"
               activeOpacity={0.7}
+              style={{ opacity: isLoading ? 0.6 : 1 }}
             >
-              <Text
-                className="text-primary text-xs"
-                style={{ fontFamily: 'Inter-SemiBold' }}
-              >
-                Claim
-              </Text>
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FF6B4A" />
+              ) : (
+                <Text
+                  className="text-primary text-xs"
+                  style={{ fontFamily: 'Inter-SemiBold' }}
+                >
+                  Claim
+                </Text>
+              )}
             </TouchableOpacity>
           )}
           {(isClaimedByMe || (isClaimed && canManage)) && (
             <TouchableOpacity
               onPress={onUnclaim}
+              disabled={isLoading}
               className="bg-charcoal/5 rounded-xl px-3 py-2 ml-2"
               activeOpacity={0.7}
+              style={{ opacity: isLoading ? 0.6 : 1 }}
             >
-              <Text
-                className="text-charcoal/50 text-xs"
-                style={{ fontFamily: 'Inter-Medium' }}
-              >
-                {isClaimedByMe ? 'Unclaim' : 'Remove'}
-              </Text>
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#9999B8" />
+              ) : (
+                <Text
+                  className="text-charcoal/50 text-xs"
+                  style={{ fontFamily: 'Inter-Medium' }}
+                >
+                  {isClaimedByMe ? 'Unclaim' : 'Remove'}
+                </Text>
+              )}
             </TouchableOpacity>
           )}
         </>

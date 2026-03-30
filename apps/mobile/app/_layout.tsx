@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Platform } from 'react-native';
 import { Stack, SplashScreen, router } from 'expo-router';
 import { useFonts } from 'expo-font';
@@ -51,6 +51,7 @@ const queryClient = new QueryClient({
 
 export default function RootLayout() {
   const { session, setSession, setUser, pendingInviteToken, setPendingInviteToken } = useAuthStore();
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     'PlusJakartaSans-Regular': require('../assets/fonts/PlusJakartaSans-Regular.ttf'),
@@ -61,6 +62,28 @@ export default function RootLayout() {
     'Inter-Medium': require('../assets/fonts/Inter-Medium.ttf'),
     'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
   });
+
+  // Set web meta tags
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    document.title = 'Hangout — AI Event Planning';
+    const setMeta = (name: string, content: string, property?: boolean) => {
+      const attr = property ? 'property' : 'name';
+      let el = document.querySelector(`meta[${attr}="${name}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, name);
+        document.head.appendChild(el);
+      }
+      el.content = content;
+    };
+    setMeta('description', 'Describe your event, AI handles the rest. Plan hangouts, split items, invite friends.');
+    setMeta('theme-color', '#FF6B4A');
+    setMeta('og:title', 'Hangout — AI Event Planning', true);
+    setMeta('og:description', 'Describe your event, AI handles the rest.', true);
+    setMeta('og:type', 'website', true);
+    setMeta('apple-mobile-web-app-capable', 'yes');
+  }, []);
 
   // Bootstrap Supabase session
   useEffect(() => {
@@ -76,6 +99,7 @@ export default function RootLayout() {
           created_at: data.session.user.created_at,
         });
       }
+      setSessionChecked(true);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
@@ -104,9 +128,10 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  // Redirect based on auth state once fonts are ready
+  // Redirect based on auth state once fonts are ready and session is resolved
   useEffect(() => {
     if (!fontsLoaded && !fontError) return;
+    if (!sessionChecked) return;
     if (session) {
       // If there's a pending invite token from before auth, redirect there
       if (pendingInviteToken) {
@@ -120,7 +145,7 @@ export default function RootLayout() {
     } else {
       router.replace('/(auth)/welcome');
     }
-  }, [fontsLoaded, fontError, session]);
+  }, [fontsLoaded, fontError, session, sessionChecked]);
 
   if (!fontsLoaded && !fontError) return null;
 
@@ -163,18 +188,14 @@ export default function RootLayout() {
 
   if (Platform.OS === 'web') {
     return (
-      <View style={{ flex: 1, backgroundColor: '#E8E4DF', alignItems: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#F0EDEA', alignItems: 'center' }}>
         <View
           style={{
-            maxWidth: 480,
+            maxWidth: 540,
             width: '100%',
             minHeight: '100%',
             backgroundColor: '#FAF9F7',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.1,
-            shadowRadius: 12,
-            elevation: 4,
+            boxShadow: '0 0 32px rgba(0,0,0,0.06)',
           }}
         >
           {appContent}

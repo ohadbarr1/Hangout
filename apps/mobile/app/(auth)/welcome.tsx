@@ -94,7 +94,7 @@ export default function WelcomeScreen() {
           </Text>
 
           {/* Feature pills */}
-          <View className="flex-row flex-wrap gap-2 justify-center mt-10">
+          <View className="flex-row flex-wrap gap-2 justify-center mt-8 mb-4">
             {[
               { icon: '✨', label: 'AI planning' },
               { icon: '🔗', label: 'Invite friends' },

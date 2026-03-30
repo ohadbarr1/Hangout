@@ -1,3 +1,60 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ─── Web-specific polish ─────────────────────────────────────────────────── */
+
+/* Smooth scrolling + font rendering */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection color matches brand */
+::selection {
+  background-color: rgba(255, 107, 74, 0.2);
+  color: #1A1A2E;
+}
+
+/* Hide scrollbars but keep scrolling on web (mobile-app feel) */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Remove tap highlight on web */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── Hover + focus states ────────────────────────────────────────────────── */
+@media (hover: hover) {
+  /* Pointer cursor on all interactive elements */
+  [role="button"],
+  button,
+  a,
+  [tabindex="0"] {
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  /* Hover lift for cards and buttons */
+  [role="button"]:hover {
+    opacity: 0.88;
+  }
+}
+
+/* Focus ring for keyboard navigation */
+:focus-visible {
+  outline: 2px solid #FF6B4A;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Inputs should have a more subtle focus */
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(255, 107, 74, 0.5);
+  outline-offset: 0;
+}

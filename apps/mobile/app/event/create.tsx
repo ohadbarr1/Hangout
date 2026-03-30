@@ -59,6 +59,7 @@ export default function CreateEventScreen() {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(NotificationFeedbackType.Success).catch(() => {});
       }
+      showAlert('Event created!');
       router.replace(`/event/${event.id}`);
     },
     onError: (err) => {
@@ -108,16 +109,29 @@ export default function CreateEventScreen() {
           {step === 'review' ? 'Your plan' : 'What\'s the plan?'}
         </Text>
         {step === 'review' && (
-          <TouchableOpacity
-            onPress={() => { setStep('input'); setParsedEvent(null); }}
-          >
-            <Text
-              className="text-primary text-sm"
-              style={{ fontFamily: 'Inter-Medium' }}
+          <View className="flex-row gap-4">
+            <TouchableOpacity
+              onPress={() => { setStep('loading'); parseMutation.mutate(description.trim()); }}
+              disabled={parseMutation.isPending}
             >
-              Edit
-            </Text>
-          </TouchableOpacity>
+              <Text
+                className="text-charcoal/50 text-sm"
+                style={{ fontFamily: 'Inter-Medium' }}
+              >
+                Regenerate
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setStep('input'); setParsedEvent(null); }}
+            >
+              <Text
+                className="text-primary text-sm"
+                style={{ fontFamily: 'Inter-Medium' }}
+              >
+                Edit
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 

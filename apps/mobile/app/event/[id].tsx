@@ -14,7 +14,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
 import { ImpactFeedbackStyle, NotificationFeedbackType } from 'expo-haptics';
 
@@ -31,6 +31,15 @@ import { EventDetailHeroSkeleton, ItemCardSkeleton } from '@/components/Skeleton
 import type { Category, EventMember } from '@hangout/shared';
 import { formatDate } from '@/utils/dateUtils';
 import { categoryEmoji } from '@/utils/categoryUtils';
+
+function useEscapeKey(onEscape: () => void, active: boolean) {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !active) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onEscape(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onEscape, active]);
+}
 
 function getCountdown(eventDate: string): string | null {
   const now = new Date();
@@ -65,6 +74,8 @@ export default function EventDetailScreen() {
   const [commentItemId, setCommentItemId] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [itemFilter, setItemFilter] = useState<'all' | 'unclaimed' | 'claimed'>('all');
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   const { data: activity } = useQuery({
     queryKey: ['activity', id],
@@ -121,6 +132,33 @@ export default function EventDetailScreen() {
       if (err instanceof Error && err.message !== 'Share was dismissed') {
         showAlert('Error', 'Could not generate invite link. Try again.');
       }
+    }
+  };
+
+  const copyEventLink = async () => {
+    if (Platform.OS !== 'web' || typeof navigator === 'undefined') return;
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showAlert('Link copied!');
+    } catch {
+      // silent
+    }
+  };
+
+  const copyShoppingList = async () => {
+    if (!items || items.length === 0) return;
+    const lines = items.map((item) => {
+      const check = item.assignment ? '✅' : '☐';
+      const qty = item.quantity != null ? ` ×${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : '';
+      const who = item.assignment?.user?.name ? ` — ${item.assignment.user.name}` : '';
+      return `${check} ${item.name}${qty}${who}`;
+    });
+    const text = `${event?.title ?? 'Shopping List'}\n${'─'.repeat(20)}\n${lines.join('\n')}`;
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+      showAlert('Copied!', 'Shopping list copied to clipboard.');
+    } else {
+      await Share.share({ message: text });
     }
   };
 
@@ -240,8 +278,13 @@ export default function EventDetailScreen() {
   const isLightHero = ['mint', 'golden'].includes(event.hero_color);
   const countdown = event.event_date ? getCountdown(event.event_date) : null;
 
-  // Group items by category
-  const itemsByCategory = (items ?? []).reduce<Record<string, typeof items>>((acc, item) => {
+  // Filter + group items by category
+  const filteredItems = (items ?? []).filter((item) => {
+    if (itemFilter === 'unclaimed') return item.assignment == null;
+    if (itemFilter === 'claimed') return item.assignment != null;
+    return true;
+  });
+  const itemsByCategory = filteredItems.reduce<Record<string, typeof items>>((acc, item) => {
     const key = item.category ?? 'Other';
     if (!acc[key]) acc[key] = [];
     acc[key]!.push(item);
@@ -271,6 +314,7 @@ export default function EventDetailScreen() {
           <View className="flex-row items-center justify-between mb-6">
             <TouchableOpacity
               onPress={() => router.back()}
+              accessibilityLabel="Go back"
               className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
             >
               <Ionicons name="arrow-back" size={20} color="#fff" />
@@ -278,6 +322,7 @@ export default function EventDetailScreen() {
             <View className="flex-row gap-2">
               <TouchableOpacity
                 onPress={shareInvite}
+                accessibilityLabel="Share invite link"
                 className="flex-row items-center bg-white/20 rounded-full px-4 py-2 gap-2"
               >
                 <Ionicons name="share-outline" size={18} color="#fff" />
@@ -288,16 +333,27 @@ export default function EventDetailScreen() {
                   Invite
                 </Text>
               </TouchableOpacity>
+              {Platform.OS === 'web' && (
+                <TouchableOpacity
+                  onPress={copyEventLink}
+                  accessibilityLabel="Copy event link"
+                  className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
+                >
+                  <Ionicons name="link-outline" size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
               {isAdminOrMod && (
                 <>
                   <TouchableOpacity
                     onPress={() => router.push(`/event/${id}/dashboard`)}
+                    accessibilityLabel="Dashboard"
                     className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
                   >
                     <Ionicons name="bar-chart-outline" size={20} color="#fff" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => router.push(`/event/${id}/items`)}
+                    accessibilityLabel="Manage items"
                     className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
                   >
                     <Ionicons name="settings-outline" size={20} color="#fff" />
@@ -308,12 +364,14 @@ export default function EventDetailScreen() {
                 <>
                   <TouchableOpacity
                     onPress={handleClone}
+                    accessibilityLabel="Duplicate event"
                     className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
                   >
                     {cloning ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="copy-outline" size={20} color="#fff" />}
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => router.push(`/event/${id}/edit`)}
+                    accessibilityLabel="Edit event"
                     className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
                   >
                     <Ionicons name="create-outline" size={20} color="#fff" />
@@ -441,8 +499,46 @@ export default function EventDetailScreen() {
           </View>
         )}
 
+        {/* Items filter bar */}
+        {!itemsLoading && totalCount > 0 && (
+          <View className="px-5 pt-5 flex-row items-center justify-between">
+            <View className="flex-row gap-1.5">
+              {([
+                { key: 'all' as const, label: 'All' },
+                { key: 'unclaimed' as const, label: 'Unclaimed' },
+                { key: 'claimed' as const, label: 'Claimed' },
+              ]).map(({ key, label }) => (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => setItemFilter(key)}
+                  className={`px-3 py-1.5 rounded-full ${
+                    itemFilter === key ? 'bg-charcoal' : 'bg-charcoal/6'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs ${itemFilter === key ? 'text-white' : 'text-charcoal/60'}`}
+                    style={{ fontFamily: 'Inter-Medium' }}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              onPress={copyShoppingList}
+              accessibilityLabel="Copy shopping list"
+              className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-charcoal/6"
+            >
+              <Ionicons name="clipboard-outline" size={13} color="#44446A" />
+              <Text className="text-charcoal/60 text-xs" style={{ fontFamily: 'Inter-Medium' }}>
+                Copy list
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Items by category */}
-        <View className="px-5 pt-6">
+        <View className="px-5 pt-4">
           {itemsLoading ? (
             <View className="gap-3 pb-6">
               <ItemCardSkeleton />
@@ -456,29 +552,60 @@ export default function EventDetailScreen() {
               </Text>
             </View>
           ) : (
-            Object.entries(itemsByCategory).map(([category, catItems]) => (
-              <View key={category} className="mb-6">
-                <Text
-                  className="text-charcoal text-base mb-3"
-                  style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}
-                >
-                  {categoryEmoji(category as Category)} {category}
-                </Text>
-                <View className="gap-2">
-                  {catItems?.map((item) => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      currentUserId={user?.id}
-                      canManage={isAdminOrMod}
-                      onClaim={() => claimMutation.mutate({ itemId: item.id })}
-                      onUnclaim={() => unclaimMutation.mutate({ itemId: item.id })}
-                      onPress={() => setCommentItemId(item.id)}
+            Object.entries(itemsByCategory).map(([category, catItems]) => {
+              const isCollapsed = collapsedCategories.has(category);
+              const toggleCollapse = () => {
+                setCollapsedCategories((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(category)) next.delete(category);
+                  else next.add(category);
+                  return next;
+                });
+              };
+              return (
+                <View key={category} className="mb-6">
+                  <TouchableOpacity
+                    onPress={toggleCollapse}
+                    className="flex-row items-center justify-between mb-3"
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      className="text-charcoal text-base"
+                      style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}
+                    >
+                      {categoryEmoji(category as Category)} {category}
+                      <Text className="text-charcoal/40 text-sm" style={{ fontFamily: 'Inter-Regular' }}>
+                        {' '}({catItems?.length})
+                      </Text>
+                    </Text>
+                    <Ionicons
+                      name={isCollapsed ? 'chevron-forward' : 'chevron-down'}
+                      size={16}
+                      color="#9999B8"
                     />
-                  ))}
+                  </TouchableOpacity>
+                  {!isCollapsed && (
+                    <View className="gap-2">
+                      {catItems?.map((item) => (
+                        <ItemCard
+                          key={item.id}
+                          item={item}
+                          currentUserId={user?.id}
+                          canManage={isAdminOrMod}
+                          isLoading={
+                            (claimMutation.isPending && claimMutation.variables?.itemId === item.id) ||
+                            (unclaimMutation.isPending && unclaimMutation.variables?.itemId === item.id)
+                          }
+                          onClaim={() => claimMutation.mutate({ itemId: item.id })}
+                          onUnclaim={() => unclaimMutation.mutate({ itemId: item.id })}
+                          onPress={() => setCommentItemId(item.id)}
+                        />
+                      ))}
+                    </View>
+                  )}
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
 
@@ -612,6 +739,8 @@ function CommentsModal({
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const queryClient = useQueryClient();
+
+  useEscapeKey(onClose, true);
 
   const { data: comments, isLoading } = useQuery({
     queryKey: ['comments', itemId],
@@ -752,6 +881,7 @@ function MembersModal({
   onRoleChange: (memberId: string, role: 'admin' | 'moderator' | 'guest') => Promise<void>;
 }) {
   const [updating, setUpdating] = useState<string | null>(null);
+  useEscapeKey(onClose, true);
   void eventId;
 
   const going    = members.filter((m) => m.rsvp_status === 'going').length;

@@ -41,6 +41,7 @@ function ProfileIcon({ color, focused }: TabIconProps) {
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const isWeb = Platform.OS === 'web';
 
   return (
     <Tabs
@@ -56,13 +57,13 @@ export default function TabsLayout() {
           shadowOpacity: 0.08,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: -2 },
-          height: 60 + (Platform.OS === 'ios' ? insets.bottom : 0),
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
+          height: isWeb ? 56 : 60 + (Platform.OS === 'ios' ? insets.bottom : 0),
+          paddingBottom: isWeb ? 6 : Platform.OS === 'ios' ? insets.bottom : 8,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontFamily: 'Inter-Medium',
-          fontSize: 11,
+          fontSize: isWeb ? 12 : 11,
           marginTop: 2,
         },
       }}

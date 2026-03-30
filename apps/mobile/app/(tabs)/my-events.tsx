@@ -1,10 +1,11 @@
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useMyEventsWithCounts } from '@/hooks/useEvent';
 import { EventCard } from '@/components/EventCard';
+import { EventCardSkeleton } from '@/components/Skeleton';
 import { EventStatus } from '@hangout/shared';
 
 const STATUS_TABS: Array<{ label: string; value: EventStatus | 'all' }> = [
@@ -20,10 +21,13 @@ export default function MyEventsScreen() {
   const insets = useSafeAreaInsets();
   const { data: events, isLoading, isRefetching, refetch } = useMyEventsWithCounts();
   const [activeTab, setActiveTab] = useState<EventStatus | 'all'>('all');
+  const [search, setSearch] = useState('');
 
-  const filtered = events?.filter(
-    (e) => activeTab === 'all' || e.status === activeTab,
-  ) ?? [];
+  const filtered = (events ?? []).filter((e) => {
+    if (activeTab !== 'all' && e.status !== activeTab) return false;
+    if (search.trim() && !e.title.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    return true;
+  });
 
   return (
     <View
@@ -38,6 +42,26 @@ export default function MyEventsScreen() {
         >
           My Events
         </Text>
+      </View>
+
+      {/* Search */}
+      <View className="px-5 pb-1">
+        <View className="flex-row items-center bg-white border border-charcoal/8 rounded-2xl px-4 gap-2">
+          <Ionicons name="search-outline" size={16} color="#9999B8" />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search events..."
+            placeholderTextColor="#9999B8"
+            className="flex-1 py-3 text-charcoal text-sm"
+            style={{ fontFamily: 'Inter-Regular' }}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={16} color="#9999B8" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Tabs */}
@@ -80,8 +104,10 @@ export default function MyEventsScreen() {
         }
       >
         {isLoading ? (
-          <View className="items-center justify-center pt-20">
-            <ActivityIndicator color="#FF6B4A" size="large" />
+          <View className="gap-3 pt-2">
+            <EventCardSkeleton />
+            <EventCardSkeleton />
+            <EventCardSkeleton />
           </View>
         ) : filtered.length === 0 ? (
           <View className="items-center justify-center pt-16">
