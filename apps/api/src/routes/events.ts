@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import type { Event, ParsedCategory } from '../shared-types';
+import { writeActivity } from '../lib/activity';
 
 const router = Router();
 
@@ -214,7 +215,41 @@ router.patch('/:id', requireAuth, validateBody(updateEventSchema), async (req, r
     return;
   }
 
+  // Write activity: event_update
+  writeActivity(id, userId, 'event_update', { fields: Object.keys(req.body) }).catch(() => {});
+
   res.json({ data: updated, error: null });
+});
+
+// ─── GET /events/:id/activity ─────────────────────────────────────────────────
+
+router.get('/:id/activity', requireAuth, async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { id } = req.params;
+  const limit = Math.min(Number(req.query.limit) || 20, 50);
+  const offset = Number(req.query.offset) || 0;
+
+  // Verify membership
+  const { data: membership } = await supabase
+    .from('event_members').select('id').eq('event_id', id).eq('user_id', userId).maybeSingle();
+  if (!membership) {
+    res.status(403).json({ data: null, error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('event_activity')
+    .select('*, user:users(id, name, avatar_url)')
+    .eq('event_id', id)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    res.status(500).json({ data: null, error: { message: error.message } });
+    return;
+  }
+
+  res.json({ data: data ?? [], error: null });
 });
 
 // ─── PATCH /events/:id/rsvp — update my RSVP status ─────────────────────────

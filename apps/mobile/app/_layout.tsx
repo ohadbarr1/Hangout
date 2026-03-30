@@ -5,14 +5,39 @@ import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import '../global.css';
 
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastProviderWithRef } from '@/components/Toast';
+import { apiClient } from '@/lib/claude';
 
 SplashScreen.preventAutoHideAsync();
+
+async function registerPushToken() {
+  if (Platform.OS === 'web') return; // web doesn't support push
+
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') return;
+
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    if (!projectId) return;
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    await apiClient.savePushToken(tokenData.data);
+  } catch {
+    // Non-critical
+  }
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -91,6 +116,7 @@ export default function RootLayout() {
       } else {
         router.replace('/(tabs)/');
       }
+      registerPushToken();
     } else {
       router.replace('/(auth)/welcome');
     }

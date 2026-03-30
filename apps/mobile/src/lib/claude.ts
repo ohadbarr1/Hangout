@@ -17,6 +17,26 @@ import type {
   AcceptInvitePayload,
 } from '@hangout/shared';
 
+export interface ActivityItem {
+  id: string;
+  event_id: string;
+  user_id: string | null;
+  type: 'join' | 'claim' | 'unclaim' | 'event_update' | 'all_claimed';
+  payload: Record<string, unknown>;
+  created_at: string;
+  user?: { id: string; name: string; avatar_url: string | null } | null;
+}
+
+export interface ItemComment {
+  id: string;
+  item_id: string;
+  event_id: string;
+  user_id: string;
+  text: string;
+  created_at: string;
+  user?: { id: string; name: string; avatar_url: string | null } | null;
+}
+
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
@@ -128,4 +148,22 @@ export const apiClient = {
 
   updateRsvp: (eventId: string, rsvp_status: 'going' | 'maybe' | 'not_going'): Promise<EventMember> =>
     request('PATCH', `/events/${eventId}/rsvp`, { rsvp_status }),
+
+  // ─── Push token ───────────────────────────────────────────────────────────
+
+  savePushToken: (token: string): Promise<{ ok: boolean }> =>
+    request('PATCH', '/users/push-token', { token }),
+
+  // ─── Activity feed ────────────────────────────────────────────────────────
+
+  getActivity: (eventId: string, offset = 0): Promise<ActivityItem[]> =>
+    request('GET', `/events/${eventId}/activity?limit=30&offset=${offset}`),
+
+  // ─── Comments ─────────────────────────────────────────────────────────────
+
+  getComments: (itemId: string): Promise<ItemComment[]> =>
+    request('GET', `/items/${itemId}/comments`),
+
+  addComment: (itemId: string, text: string): Promise<ItemComment> =>
+    request('POST', `/items/${itemId}/comments`, { text }),
 };

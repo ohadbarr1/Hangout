@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { notificationService } from '../services/notificationService';
+import { writeActivity } from '../lib/activity';
 
 const router = Router();
 
@@ -79,6 +80,31 @@ router.post('/:id/claim', requireAuth, validateBody(claimSchema), async (req, re
   // Notify event admin (fire and forget)
   void notifyAdminOnClaim(item, userId, assignment.user).catch(console.error);
 
+  // Write activity: claim
+  const claimerUser = assignment.user as { name?: string } | null;
+  writeActivity(item.event_id, userId, 'claim', { itemName: item.name, userName: claimerUser?.name }).catch(() => {});
+
+  // Check if all items are now claimed
+  void (async () => {
+    try {
+      const { data: allItems } = await supabase
+        .from('items')
+        .select('id')
+        .eq('event_id', item.event_id);
+      if (allItems && allItems.length > 0) {
+        const { data: allAssignments } = await supabase
+          .from('assignments')
+          .select('item_id')
+          .in('item_id', allItems.map((i) => i.id));
+        if (allAssignments && allAssignments.length === allItems.length) {
+          writeActivity(item.event_id, null, 'all_claimed', {}).catch(() => {});
+        }
+      }
+    } catch {
+      // Non-critical
+    }
+  })();
+
   res.status(201).json({ data: assignment, error: null });
 });
 
@@ -104,6 +130,13 @@ router.delete('/:id/unclaim', requireAuth, async (req, res) => {
     return;
   }
 
+  // Fetch item name + event_id for activity log
+  const { data: itemForActivity } = await supabase
+    .from('items')
+    .select('name, event_id')
+    .eq('id', itemId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from('assignments')
     .delete()
@@ -112,6 +145,11 @@ router.delete('/:id/unclaim', requireAuth, async (req, res) => {
   if (error) {
     res.status(500).json({ data: null, error: { message: error.message } });
     return;
+  }
+
+  // Write activity: unclaim
+  if (itemForActivity) {
+    writeActivity(itemForActivity.event_id, userId, 'unclaim', { itemName: itemForActivity.name }).catch(() => {});
   }
 
   res.json({ data: { item_id: itemId }, error: null });

@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
+import { writeActivity } from '../lib/activity';
+import { notificationService } from '../services/notificationService';
 
 const router = Router();
 
@@ -102,7 +104,7 @@ router.post('/invites/:token/accept', requireAuth, validateBody(acceptInviteSche
 
   const { data: invite } = await supabase
     .from('invites')
-    .select('*, event:events(id, title, status)')
+    .select('*, event:events(id, title, status, admin_id)')
     .eq('token', token)
     .maybeSingle();
 
@@ -116,7 +118,7 @@ router.post('/invites/:token/accept', requireAuth, validateBody(acceptInviteSche
     return;
   }
 
-  const eventData = invite.event as { id: string; status: string } | null;
+  const eventData = invite.event as { id: string; status: string; title: string; admin_id: string } | null;
   if (!eventData || eventData.status === 'cancelled') {
     res.status(400).json({ data: null, error: { message: 'This event is no longer available', code: 'EVENT_UNAVAILABLE' } });
     return;
@@ -146,6 +148,30 @@ router.post('/invites/:token/accept', requireAuth, validateBody(acceptInviteSche
       .insert({ invite_id: invite.id, user_id: userId, accepted_at: new Date().toISOString() });
   } catch {
     // Non-critical: table may not exist yet. Invite acceptance still succeeds.
+  }
+
+  // Look up joiner's name for activity + notification
+  const { data: joiner } = await supabase.from('users').select('name').eq('id', userId).single();
+
+  // Write activity: join
+  writeActivity(invite.event_id, userId, 'join', { userName: joiner?.name ?? null }).catch(() => {});
+
+  // Notify event admin that someone joined
+  if (eventData.admin_id && eventData.admin_id !== userId) {
+    const { data: adminUser } = await supabase
+      .from('users')
+      .select('expo_push_token, name')
+      .eq('id', eventData.admin_id)
+      .single();
+    if (adminUser?.expo_push_token) {
+      const joinerName = joiner?.name ?? 'Someone';
+      notificationService.sendPush({
+        to: adminUser.expo_push_token,
+        title: eventData.title,
+        body: `${joinerName} just joined! 👋`,
+        data: { eventId: invite.event_id },
+      }).catch(() => {});
+    }
   }
 
   res.json({ data: membership, error: null });

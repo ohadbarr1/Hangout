@@ -9,6 +9,7 @@ interface ItemCardProps {
   onClaim?: () => void;
   onUnclaim?: () => void;
   onDelete?: () => void;
+  onPress?: () => void;
   /** Preview mode — no claim/assign actions, used in create flow */
   preview?: boolean;
   /** Admin mode — shows delete button */
@@ -21,6 +22,7 @@ export const ItemCard = React.memo(function ItemCard({
   onClaim,
   onUnclaim,
   onDelete,
+  onPress,
   preview = false,
   adminMode = false,
 }: ItemCardProps) {
@@ -29,6 +31,11 @@ export const ItemCard = React.memo(function ItemCard({
   const claimer = item.assignment?.user;
 
   return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={onPress ? 0.75 : 1}
+      disabled={!onPress}
+    >
     <View
       className={`bg-white rounded-2xl px-4 py-3.5 flex-row items-center ${
         isClaimed ? 'opacity-80' : ''
@@ -150,5 +157,6 @@ export const ItemCard = React.memo(function ItemCard({
         </TouchableOpacity>
       )}
     </View>
+    </TouchableOpacity>
   );
 });

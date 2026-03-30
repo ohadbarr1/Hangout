@@ -6,11 +6,14 @@ import {
   Share,
   Platform,
   RefreshControl,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { ImpactFeedbackStyle, NotificationFeedbackType } from 'expo-haptics';
@@ -22,6 +25,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { AvatarGroup } from '@/components/AvatarGroup';
 import { ItemCard } from '@/components/ItemCard';
 import { apiClient } from '@/lib/claude';
+import type { ActivityItem } from '@/lib/claude';
 import { showAlert } from '@/components/Toast';
 import { EventDetailHeroSkeleton, ItemCardSkeleton } from '@/components/Skeleton';
 import type { Category } from '@hangout/shared';
@@ -58,6 +62,14 @@ export default function EventDetailScreen() {
   const { data: items, isLoading: itemsLoading, refetch: refetchItems } = useItems(id);
   const { data: members, refetch: refetchMembers } = useEventMembers(id);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [commentItemId, setCommentItemId] = useState<string | null>(null);
+
+  const { data: activity } = useQuery({
+    queryKey: ['activity', id],
+    queryFn: () => apiClient.getActivity(id!),
+    staleTime: 60_000,
+    enabled: !!id,
+  });
 
   const myMembership = members?.find((m) => m.user_id === user?.id);
   const myRsvp = myMembership?.rsvp_status ?? null;
@@ -424,6 +436,7 @@ export default function EventDetailScreen() {
                       currentUserId={user?.id}
                       onClaim={() => claimMutation.mutate({ itemId: item.id })}
                       onUnclaim={() => unclaimMutation.mutate({ itemId: item.id })}
+                      onPress={() => setCommentItemId(item.id)}
                     />
                   ))}
                 </View>
@@ -431,7 +444,29 @@ export default function EventDetailScreen() {
             ))
           )}
         </View>
+
+        {/* Activity Feed */}
+        {activity && activity.length > 0 && (
+          <View className="px-5 pt-4 pb-2">
+            <Text className="text-charcoal text-base mb-3" style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}>
+              Activity
+            </Text>
+            <View className="gap-2">
+              {activity.map((item) => (
+                <ActivityRow key={item.id} item={item} />
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
+
+      {commentItemId && (
+        <CommentsModal
+          itemId={commentItemId}
+          currentUserId={user?.id ?? ''}
+          onClose={() => setCommentItemId(null)}
+        />
+      )}
     </View>
   );
 }
@@ -450,6 +485,179 @@ function HeroBadge({ icon, label, isLight }: { icon: keyof typeof Ionicons.glyph
         {label}
       </Text>
     </View>
+  );
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${diffDay}d ago`;
+}
+
+function activityEmoji(type: ActivityItem['type']): string {
+  switch (type) {
+    case 'join': return '👋';
+    case 'claim': return '✅';
+    case 'unclaim': return '↩️';
+    case 'event_update': return '📅';
+    case 'all_claimed': return '🎉';
+    default: return '•';
+  }
+}
+
+function formatActivityLabel(item: ActivityItem): string {
+  const name = item.user?.name ?? 'Someone';
+  switch (item.type) {
+    case 'join': return `${name} joined the event`;
+    case 'claim': return `${name} claimed ${(item.payload as Record<string, unknown> & { itemName?: string }).itemName ?? 'an item'}`;
+    case 'unclaim': return `${name} unclaimed ${(item.payload as Record<string, unknown> & { itemName?: string }).itemName ?? 'an item'}`;
+    case 'event_update': return `${name} updated the event`;
+    case 'all_claimed': return '🎉 All items are claimed!';
+    default: return 'Activity';
+  }
+}
+
+function ActivityRow({ item }: { item: ActivityItem }) {
+  const label = formatActivityLabel(item);
+  const timeAgo = formatTimeAgo(item.created_at);
+
+  return (
+    <View className="flex-row items-start gap-3">
+      <View className="w-7 h-7 rounded-full bg-charcoal/8 items-center justify-center mt-0.5 shrink-0">
+        <Text style={{ fontSize: 12 }}>{activityEmoji(item.type)}</Text>
+      </View>
+      <View className="flex-1">
+        <Text className="text-charcoal/70 text-sm leading-5" style={{ fontFamily: 'Inter-Regular' }}>
+          {label}
+        </Text>
+        <Text className="text-charcoal/35 text-xs mt-0.5" style={{ fontFamily: 'Inter-Regular' }}>
+          {timeAgo}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function CommentsModal({
+  itemId,
+  currentUserId,
+  onClose,
+}: {
+  itemId: string;
+  currentUserId: string;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: comments, isLoading } = useQuery({
+    queryKey: ['comments', itemId],
+    queryFn: () => apiClient.getComments(itemId),
+    staleTime: 30_000,
+  });
+
+  const handleSubmit = async () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setSubmitting(true);
+    try {
+      await apiClient.addComment(itemId, trimmed);
+      setText('');
+      queryClient.invalidateQueries({ queryKey: ['comments', itemId] });
+    } catch {
+      // silent
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // currentUserId param reserved for future use (e.g. own-comment highlighting)
+  void currentUserId;
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 bg-black/40 justify-end">
+        <View className="bg-warmwhite rounded-t-3xl" style={{ maxHeight: '70%' }}>
+          {/* Handle */}
+          <View className="items-center pt-3 pb-2">
+            <View className="w-10 h-1 bg-charcoal/20 rounded-full" />
+          </View>
+          <View className="flex-row items-center justify-between px-5 pb-4">
+            <Text className="text-charcoal text-lg" style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}>
+              Comments
+            </Text>
+            <TouchableOpacity onPress={onClose} className="w-8 h-8 rounded-full bg-charcoal/8 items-center justify-center">
+              <Ionicons name="close" size={16} color="#1A1A2E" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView className="px-5" style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled">
+            {isLoading ? (
+              <ActivityIndicator color="#FF6B4A" className="py-8" />
+            ) : (comments ?? []).length === 0 ? (
+              <Text className="text-charcoal/40 text-sm text-center py-8" style={{ fontFamily: 'Inter-Regular' }}>
+                No comments yet. Be the first!
+              </Text>
+            ) : (
+              <View className="gap-4 pb-4">
+                {(comments ?? []).map((c) => (
+                  <View key={c.id} className="flex-row gap-3">
+                    <View className="w-7 h-7 rounded-full bg-primary/15 items-center justify-center shrink-0">
+                      <Text className="text-primary text-xs" style={{ fontFamily: 'PlusJakartaSans-Bold' }}>
+                        {c.user?.name?.charAt(0).toUpperCase() ?? '?'}
+                      </Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-charcoal/50 text-xs mb-0.5" style={{ fontFamily: 'Inter-Medium' }}>
+                        {c.user?.name ?? 'Unknown'} · {formatTimeAgo(c.created_at)}
+                      </Text>
+                      <Text className="text-charcoal text-sm leading-5" style={{ fontFamily: 'Inter-Regular' }}>
+                        {c.text}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Input row */}
+          <View className="flex-row items-center gap-3 px-5 py-4 border-t border-charcoal/8">
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder="Add a comment..."
+              placeholderTextColor="#9999B8"
+              className="flex-1 bg-white border border-charcoal/10 rounded-2xl px-4 py-3 text-charcoal text-sm"
+              style={{ fontFamily: 'Inter-Regular' }}
+              returnKeyType="send"
+              onSubmitEditing={handleSubmit}
+              blurOnSubmit={false}
+            />
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={submitting || !text.trim()}
+              className="w-10 h-10 rounded-full bg-primary items-center justify-center"
+              style={{ opacity: submitting || !text.trim() ? 0.5 : 1 }}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Ionicons name="send" size={16} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 

@@ -13,6 +13,7 @@ import { itemsRouter } from './routes/items';
 import { assignmentsRouter } from './routes/assignments';
 import { invitesRouter } from './routes/invites';
 import { parseRouter } from './routes/parse';
+import { usersRouter } from './routes/users';
 
 // ─── Logger ───────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,7 @@ app.use('/events', eventsRouter);
 app.use('/items', itemsRouter);
 app.use('/items', assignmentsRouter);
 app.use('/', invitesRouter);
+app.use('/users', usersRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 

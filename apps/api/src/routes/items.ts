@@ -174,4 +174,49 @@ router.delete('/:id', requireAuth, async (req, res) => {
   res.json({ data: { id }, error: null });
 });
 
+// ─── GET /items/:id/comments ──────────────────────────────────────────────────
+
+router.get('/:id/comments', requireAuth, async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { id } = req.params;
+
+  // Get item to check event membership
+  const { data: item } = await supabase.from('items').select('event_id').eq('id', id).single();
+  if (!item) { res.status(404).json({ data: null, error: { message: 'Item not found' } }); return; }
+
+  const { data: membership } = await supabase.from('event_members').select('id').eq('event_id', item.event_id).eq('user_id', userId).maybeSingle();
+  if (!membership) { res.status(403).json({ data: null, error: { message: 'Access denied' } }); return; }
+
+  const { data, error } = await supabase
+    .from('item_comments')
+    .select('*, user:users(id, name, avatar_url)')
+    .eq('item_id', id)
+    .order('created_at', { ascending: true });
+
+  if (error) { res.status(500).json({ data: null, error: { message: error.message } }); return; }
+  res.json({ data: data ?? [], error: null });
+});
+
+// ─── POST /items/:id/comments ─────────────────────────────────────────────────
+
+router.post('/:id/comments', requireAuth, validateBody(z.object({ text: z.string().min(1).max(500) })), async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { id } = req.params;
+
+  const { data: item } = await supabase.from('items').select('event_id').eq('id', id).single();
+  if (!item) { res.status(404).json({ data: null, error: { message: 'Item not found' } }); return; }
+
+  const { data: membership } = await supabase.from('event_members').select('id').eq('event_id', item.event_id).eq('user_id', userId).maybeSingle();
+  if (!membership) { res.status(403).json({ data: null, error: { message: 'Access denied' } }); return; }
+
+  const { data: comment, error } = await supabase
+    .from('item_comments')
+    .insert({ item_id: id, event_id: item.event_id, user_id: userId, text: req.body.text })
+    .select('*, user:users(id, name, avatar_url)')
+    .single();
+
+  if (error) { res.status(500).json({ data: null, error: { message: error.message } }); return; }
+  res.json({ data: comment, error: null });
+});
+
 export { router as itemsRouter };
