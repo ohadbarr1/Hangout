@@ -6,6 +6,7 @@ import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import type { Event, ParsedCategory } from '../shared-types';
 import { writeActivity } from '../lib/activity';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -60,6 +61,8 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // ─── POST /events — create event (optionally with AI-parsed items) ─────────────
+// All three writes (event → member → items) are wrapped with compensating
+// deletes so a partial failure never leaves orphaned rows in the database.
 
 router.post('/', requireAuth, validateBody(createEventSchema), async (req, res) => {
   const { userId } = req as AuthenticatedRequest;
@@ -68,6 +71,7 @@ router.post('/', requireAuth, validateBody(createEventSchema), async (req, res) 
   // Generate a short unique invite code
   const invite_code = generateInviteCode();
 
+  // ── Step 1: Create event ──────────────────────────────────────────────────
   const { data: event, error: eventError } = await supabase
     .from('events')
     .insert({
@@ -84,15 +88,26 @@ router.post('/', requireAuth, validateBody(createEventSchema), async (req, res) 
     return;
   }
 
-  // Add creator as admin member
-  await supabase.from('event_members').insert({
+  // ── Step 2: Add creator as admin member ───────────────────────────────────
+  const { error: memberError } = await supabase.from('event_members').insert({
     event_id: event.id,
     user_id: userId,
     role: 'admin',
     rsvp_status: 'going',
   });
 
-  // Bulk-insert AI-parsed items if provided
+  if (memberError) {
+    // Rollback: remove the event so no orphan is left
+    logger.error('[events] Failed to create admin membership — rolling back event', {
+      eventId: event.id,
+      error: memberError.message,
+    });
+    await supabase.from('events').delete().eq('id', event.id);
+    res.status(500).json({ data: null, error: { message: 'Failed to create event membership' } });
+    return;
+  }
+
+  // ── Step 3: Bulk-insert AI-parsed items if provided ───────────────────────
   if (parsed_categories && Array.isArray(parsed_categories)) {
     const items = (parsed_categories as ParsedCategory[]).flatMap((cat) =>
       cat.items.map((item) => ({
@@ -107,7 +122,19 @@ router.post('/', requireAuth, validateBody(createEventSchema), async (req, res) 
     );
 
     if (items.length > 0) {
-      await supabase.from('items').insert(items);
+      const { error: itemsError } = await supabase.from('items').insert(items);
+
+      if (itemsError) {
+        // Rollback: cascade delete on events removes members + items
+        logger.error('[events] Failed to insert parsed items — rolling back event', {
+          eventId: event.id,
+          itemCount: items.length,
+          error: itemsError.message,
+        });
+        await supabase.from('events').delete().eq('id', event.id);
+        res.status(500).json({ data: null, error: { message: 'Failed to create event items' } });
+        return;
+      }
     }
   }
 
@@ -149,10 +176,15 @@ router.get('/:id', requireAuth, async (req, res) => {
 });
 
 // ─── GET /events/:id/members ──────────────────────────────────────────────────
+// Paginated to prevent unbounded responses on large events.
+// Query params: ?limit=50&offset=0  (max 100 per page)
 
 router.get('/:id/members', requireAuth, async (req, res) => {
   const { userId } = req as AuthenticatedRequest;
   const { id } = req.params;
+
+  const limit = Math.min(Number(req.query.limit) || 50, 100);
+  const offset = Number(req.query.offset) || 0;
 
   // Verify membership
   const { data: membership } = await supabase
@@ -167,17 +199,23 @@ router.get('/:id/members', requireAuth, async (req, res) => {
     return;
   }
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from('event_members')
-    .select('*, user:users(id, name, avatar_url)')
-    .eq('event_id', id);
+    .select('*, user:users(id, name, avatar_url)', { count: 'exact' })
+    .eq('event_id', id)
+    .order('joined_at', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     res.status(500).json({ data: null, error: { message: error.message } });
     return;
   }
 
-  res.json({ data: data ?? [], error: null });
+  res.json({
+    data: data ?? [],
+    meta: { total: count ?? 0, limit, offset },
+    error: null,
+  });
 });
 
 // ─── PATCH /events/:id ────────────────────────────────────────────────────────
@@ -320,7 +358,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
   res.json({ data: { id }, error: null });
 });
 
-// ─── POST /events/:id/clone — duplicate an event (4.5) ───────────────────────
+// ─── POST /events/:id/clone — duplicate an event ─────────────────────────────
 
 router.post('/:id/clone', requireAuth, async (req, res) => {
   const { userId } = req as AuthenticatedRequest;
@@ -356,12 +394,18 @@ router.post('/:id/clone', requireAuth, async (req, res) => {
   }
 
   // Add creator as admin member
-  await supabase.from('event_members').insert({
+  const { error: memberError } = await supabase.from('event_members').insert({
     event_id: cloned.id,
     user_id: userId,
     role: 'admin',
     rsvp_status: 'going',
   });
+
+  if (memberError) {
+    await supabase.from('events').delete().eq('id', cloned.id);
+    res.status(500).json({ data: null, error: { message: 'Failed to clone event membership' } });
+    return;
+  }
 
   // Clone items (clear assignments)
   const { data: sourceItems } = await supabase.from('items').select('*').eq('event_id', id);
@@ -382,7 +426,7 @@ router.post('/:id/clone', requireAuth, async (req, res) => {
   res.status(201).json({ data: cloned, error: null });
 });
 
-// ─── PATCH /events/:id/members/:memberId — promote/demote co-host (4.4) ──────
+// ─── PATCH /events/:id/members/:memberId — promote/demote co-host ─────────────
 
 router.patch('/:id/members/:memberId', requireAuth, validateBody(z.object({
   role: z.enum(['admin', 'moderator', 'guest']),

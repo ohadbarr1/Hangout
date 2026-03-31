@@ -6,27 +6,34 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createClient } from '@supabase/supabase-js';
-import { createLogger, format, transports } from 'winston';
 
+// ─── Sentry (optional — only initialised when SENTRY_DSN is set) ──────────────
+// Must be imported before routes to instrument them properly.
+if (process.env.SENTRY_DSN) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Sentry = require('@sentry/node');
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV ?? 'development',
+      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+    });
+  } catch {
+    // @sentry/node not installed — skip silently
+  }
+}
+
+import { logger } from './lib/logger';
 import { eventsRouter } from './routes/events';
 import { itemsRouter } from './routes/items';
 import { assignmentsRouter } from './routes/assignments';
 import { invitesRouter } from './routes/invites';
 import { parseRouter } from './routes/parse';
 import { usersRouter } from './routes/users';
+import type { AuthenticatedRequest } from './middleware/auth';
 
-// ─── Logger ───────────────────────────────────────────────────────────────────
-
-export const logger = createLogger({
-  level: process.env.LOG_LEVEL ?? 'info',
-  format: format.combine(
-    format.timestamp(),
-    process.env.NODE_ENV === 'production'
-      ? format.json()
-      : format.combine(format.colorize(), format.simple()),
-  ),
-  transports: [new transports.Console()],
-});
+// Re-export logger so other modules that import from 'index' still work
+export { logger };
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -82,6 +89,7 @@ app.use('/events/parse', parseLimiter);
 app.use('/invites', inviteLimiter);
 
 // ─── Request Logging ──────────────────────────────────────────────────────────
+// Logs method, path, status, latency, and user_id (when authenticated).
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -93,6 +101,7 @@ app.use((req, res, next) => {
       path: req.path,
       status: res.statusCode,
       duration_ms: duration,
+      user_id: (req as AuthenticatedRequest).userId ?? undefined,
     });
   });
   next();
@@ -118,7 +127,10 @@ app.get('/health', async (_req, res) => {
   // Claude API check (just verify key exists)
   checks.claude = process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing';
 
-  const allOk = Object.values(checks).every((v) => v === 'ok' || v === 'configured');
+  // Sentry check
+  checks.sentry = process.env.SENTRY_DSN ? 'configured' : 'not_configured';
+
+  const allOk = Object.values(checks).every((v) => v === 'ok' || v === 'configured' || v === 'not_configured');
 
   res.status(allOk ? 200 : 503).json({
     status: allOk ? 'ok' : 'degraded',
@@ -150,6 +162,17 @@ app.use((_req, res) => {
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error({ message: err.message, stack: err.stack });
+
+  // Forward to Sentry if configured
+  if (process.env.SENTRY_DSN) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      require('@sentry/node').captureException(err);
+    } catch {
+      // Sentry not installed — skip
+    }
+  }
+
   res.status(500).json({
     data: null,
     error: { message: 'Internal server error', code: 'INTERNAL_ERROR' },
@@ -162,6 +185,7 @@ if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
     logger.info(`Hangout API running on http://localhost:${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
+    logger.info(`Sentry: ${process.env.SENTRY_DSN ? 'enabled' : 'disabled (set SENTRY_DSN to enable)'}`);
   });
 }
 

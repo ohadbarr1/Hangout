@@ -49,19 +49,12 @@ router.post('/:id/claim', requireAuth, validateBody(claimSchema), async (req, re
     return;
   }
 
-  // Check item is not already claimed
-  const { data: existing } = await supabase
-    .from('assignments')
-    .select('id, user_id')
-    .eq('item_id', itemId)
-    .maybeSingle();
-
-  if (existing) {
-    res.status(409).json({ data: null, error: { message: 'Item is already claimed', code: 'CONFLICT' } });
-    return;
-  }
-
-  // Create assignment
+  // ─── Atomic claim ─────────────────────────────────────────────────────────
+  // We rely on the UNIQUE constraint on assignments(item_id) added in
+  // migration 004_phase1_fixes.sql.  Two concurrent requests will both
+  // attempt an INSERT; exactly one will succeed and the other will receive
+  // PostgreSQL error code 23505 (unique_violation) which we map to 409.
+  // This removes the SELECT → check → INSERT race window that existed before.
   const { data: assignment, error } = await supabase
     .from('assignments')
     .insert({
@@ -72,8 +65,18 @@ router.post('/:id/claim', requireAuth, validateBody(claimSchema), async (req, re
     .select('*, user:users(id, name, avatar_url)')
     .single();
 
-  if (error || !assignment) {
-    res.status(500).json({ data: null, error: { message: error?.message ?? 'Failed to claim item' } });
+  if (error) {
+    // Unique constraint violation: item was claimed by a concurrent request
+    if (error.code === '23505') {
+      res.status(409).json({ data: null, error: { message: 'Item is already claimed', code: 'CONFLICT' } });
+      return;
+    }
+    res.status(500).json({ data: null, error: { message: error.message ?? 'Failed to claim item' } });
+    return;
+  }
+
+  if (!assignment) {
+    res.status(500).json({ data: null, error: { message: 'Failed to claim item' } });
     return;
   }
 
