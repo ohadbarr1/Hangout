@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { showAlert } from '@/components/Toast';
 import { RsvpStatus } from '@hangout/shared';
 import type { Invite } from '@hangout/shared';
+import { useT } from '@/i18n';
 
 type InviteState = 'loading' | 'preview' | 'joining' | 'error';
 
@@ -25,6 +26,7 @@ export default function InviteScreen() {
   const [state, setState] = useState<InviteState>('loading');
   const [invite, setInvite] = useState<Invite | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const { t } = useT();
 
   useEffect(() => {
     if (!token) return;
@@ -104,7 +106,7 @@ export default function InviteScreen() {
               className="text-charcoal/50 text-base mt-4"
               style={{ fontFamily: 'Inter-Regular' }}
             >
-              Loading invite...
+              {t('invite_loading')}
             </Text>
           </>
         )}
@@ -133,7 +135,7 @@ export default function InviteScreen() {
               className="bg-primary rounded-2xl px-8 py-4"
             >
               <Text className="text-white text-base" style={{ fontFamily: 'Inter-SemiBold' }}>
-                Go home
+                {t('invite_go_home')}
               </Text>
             </TouchableOpacity>
           </>
@@ -162,7 +164,7 @@ export default function InviteScreen() {
                 className="text-charcoal/50 text-sm text-center mb-2"
                 style={{ fontFamily: 'Inter-Regular' }}
               >
-                You're invited to
+                {t('invite_you_are_invited')}
               </Text>
               <Text
                 className="text-charcoal text-2xl text-center mb-5"
@@ -203,7 +205,7 @@ export default function InviteScreen() {
                   <View className="flex-row items-center gap-3">
                     <Ionicons name="people-outline" size={16} color="#9999B8" />
                     <Text className="text-charcoal/70 text-sm" style={{ fontFamily: 'Inter-Regular' }}>
-                      {(invite.event as any).member_count} {(invite.event as any).member_count === 1 ? 'person' : 'people'} going
+                      {t('invite_people_going', { count: (invite.event as any).member_count })}
                     </Text>
                   </View>
                 )}
@@ -212,7 +214,7 @@ export default function InviteScreen() {
                   <View className="flex-row items-center gap-3">
                     <Ionicons name="bag-outline" size={16} color="#9999B8" />
                     <Text className="text-charcoal/70 text-sm" style={{ fontFamily: 'Inter-Regular' }}>
-                      {(invite.event as any).item_count} items to claim
+                      {t('invite_items_to_claim', { count: (invite.event as any).item_count })}
                     </Text>
                   </View>
                 )}
@@ -224,7 +226,7 @@ export default function InviteScreen() {
                 className="text-charcoal/50 text-sm text-center mb-4"
                 style={{ fontFamily: 'Inter-Regular' }}
               >
-                You'll need to sign in first.
+                {t('invite_sign_in_first')}
               </Text>
             )}
 
@@ -241,7 +243,7 @@ export default function InviteScreen() {
                   className="text-white text-base"
                   style={{ fontFamily: 'Inter-SemiBold' }}
                 >
-                  {session ? "I'm in!" : 'Sign in to join'}
+                  {session ? t('invite_im_in') : t('invite_sign_in_to_join')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -254,7 +256,7 @@ export default function InviteScreen() {
                 activeOpacity={0.75}
               >
                 <Text className="text-charcoal/60 text-base" style={{ fontFamily: 'Inter-Regular' }}>
-                  Maybe — I'll let you know
+                  {t('invite_maybe_label')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -267,7 +269,7 @@ export default function InviteScreen() {
                 className="text-charcoal/50 text-sm"
                 style={{ fontFamily: 'Inter-Regular' }}
               >
-                Maybe later
+                {t('invite_maybe_later')}
               </Text>
             </TouchableOpacity>
           </>

@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +26,12 @@ import { useAuthStore } from '@/stores/authStore';
 import { ProgressRing } from '@/components/ProgressRing';
 import { AvatarGroup } from '@/components/AvatarGroup';
 import { ItemCard } from '@/components/ItemCard';
+import Animated from 'react-native-reanimated';
+import { useFadeInUp } from '@/hooks/useFadeInUp';
+import { CelebrationOverlay } from '@/components/CelebrationOverlay';
+import { useCelebration } from '@/hooks/useCelebration';
+import { usePresence } from '@/hooks/usePresence';
+import { PresenceAvatars } from '@/components/PresenceAvatars';
 import { apiClient } from '@/lib/claude';
 import type { ActivityItem } from '@/lib/claude';
 import { showAlert } from '@/components/Toast';
@@ -31,6 +39,7 @@ import { EventDetailHeroSkeleton, ItemCardSkeleton } from '@/components/Skeleton
 import type { Category, EventMember } from '@hangout/shared';
 import { formatDate } from '@/utils/dateUtils';
 import { categoryEmoji } from '@/utils/categoryUtils';
+import { useT, translate } from '@/i18n';
 
 function useEscapeKey(onEscape: () => void, active: boolean) {
   useEffect(() => {
@@ -41,15 +50,15 @@ function useEscapeKey(onEscape: () => void, active: boolean) {
   }, [onEscape, active]);
 }
 
-function getCountdown(eventDate: string): string | null {
+function getCountdown(eventDate: string, lang: string): string | null {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const target = new Date(eventDate);
   target.setHours(0, 0, 0, 0);
   const diff = Math.round((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   if (diff <= 0) return null;
-  if (diff === 1) return '🔔 Tomorrow!';
-  if (diff <= 7) return `⏳ ${diff} days to go`;
+  if (diff === 1) return translate(lang, 'detail_tomorrow');
+  if (diff <= 7) return translate(lang, 'detail_days_to_go', { days: diff });
   return null;
 }
 
@@ -67,6 +76,7 @@ export default function EventDetailScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
+  const { t, lang } = useT();
   const { data: event, isLoading: eventLoading, refetch: refetchEvent } = useEvent(id);
   const { data: items, isLoading: itemsLoading, refetch: refetchItems } = useItems(id);
   const { data: members, refetch: refetchMembers } = useEventMembers(id);
@@ -77,11 +87,20 @@ export default function EventDetailScreen() {
   const [itemFilter, setItemFilter] = useState<'all' | 'unclaimed' | 'claimed'>('all');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
+  const { viewers } = usePresence(id, user);
+
   const { data: activity } = useQuery({
     queryKey: ['activity', id],
     queryFn: () => apiClient.getActivity(id!),
     staleTime: 60_000,
     enabled: !!id,
+  });
+
+  const { data: suggestions } = useQuery({
+    queryKey: ['suggestions', id],
+    queryFn: () => apiClient.suggestItems(id!),
+    staleTime: 5 * 60_000,
+    enabled: !!id && !itemsLoading,
   });
 
   const myMembership = members?.find((m) => m.user_id === user?.id);
@@ -98,6 +117,22 @@ export default function EventDetailScreen() {
   const isAdmin = event?.admin_id === user?.id;
   const isModerator = myMembership?.role === 'moderator';
   const isAdminOrMod = isAdmin || isModerator;
+
+  const celebration = useCelebration();
+  const prevClaimedRef = React.useRef(claimedCount);
+  React.useEffect(() => {
+    if (
+      totalCount > 0 &&
+      claimedCount === totalCount &&
+      prevClaimedRef.current < totalCount
+    ) {
+      celebration.trigger();
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(NotificationFeedbackType.Success).catch(() => {});
+      }
+    }
+    prevClaimedRef.current = claimedCount;
+  }, [claimedCount, totalCount]);
 
   const shareInvite = async () => {
     if (!event) return;
@@ -232,6 +267,17 @@ export default function EventDetailScreen() {
     },
   });
 
+  const quickAddMutation = useMutation({
+    mutationFn: (text: string) => apiClient.quickAddItems(id!, text),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items', id] });
+      queryClient.invalidateQueries({ queryKey: ['suggestions', id] });
+    },
+    onError: (err) => {
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to add items.');
+    },
+  });
+
   const rsvpMutation = useMutation({
     mutationFn: (rsvp_status: 'going' | 'maybe' | 'not_going') =>
       apiClient.updateRsvp(id!, rsvp_status),
@@ -274,9 +320,8 @@ export default function EventDetailScreen() {
     );
   }
 
-  const [colorStart] = HERO_GRADIENTS[event.hero_color] ?? HERO_GRADIENTS.coral;
   const isLightHero = ['mint', 'golden'].includes(event.hero_color);
-  const countdown = event.event_date ? getCountdown(event.event_date) : null;
+  const countdown = event.event_date ? getCountdown(event.event_date, lang) : null;
 
   // Filter + group items by category
   const filteredItems = (items ?? []).filter((item) => {
@@ -302,9 +347,11 @@ export default function EventDetailScreen() {
         }
       >
         {/* Hero */}
-        <View
+        <LinearGradient
+          colors={HERO_GRADIENTS[event.hero_color] ?? HERO_GRADIENTS.coral}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={{
-            backgroundColor: colorStart,
             paddingTop: insets.top + 12,
             paddingBottom: 32,
             paddingHorizontal: 20,
@@ -330,7 +377,7 @@ export default function EventDetailScreen() {
                   className="text-white text-sm"
                   style={{ fontFamily: 'Inter-SemiBold' }}
                 >
-                  Invite
+                  {t('detail_share_invite')}
                 </Text>
               </TouchableOpacity>
               {Platform.OS === 'web' && (
@@ -410,6 +457,12 @@ export default function EventDetailScreen() {
               </Text>
             </View>
           )}
+          {viewers.length > 0 && (
+            <View className="mb-3">
+              <PresenceAvatars viewers={viewers} />
+            </View>
+          )}
+
           <View className="flex-row flex-wrap gap-3 mb-5">
             {event.event_date && (
               <HeroBadge icon="calendar-outline" label={formatDate(event.event_date)} isLight={isLightHero} />
@@ -440,7 +493,7 @@ export default function EventDetailScreen() {
                   className="text-white/70 text-xs"
                   style={{ fontFamily: 'Inter-Regular' }}
                 >
-                  items claimed
+                  {t('detail_items_claimed')}
                 </Text>
               </View>
             </View>
@@ -455,7 +508,28 @@ export default function EventDetailScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </LinearGradient>
+
+        {/* Recap banner for completed events */}
+        {event.status === 'completed' && (
+          <TouchableOpacity
+            onPress={() => router.push({ pathname: `/event/${id}/recap`, params: { color: event.hero_color } })}
+            className="mx-5 mt-5 rounded-2xl overflow-hidden"
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={HERO_GRADIENTS[event.hero_color] ?? HERO_GRADIENTS.coral}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 }}
+            >
+              <Text style={{ color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 15 }}>
+                {t('detail_view_recap')}
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
         {/* RSVP buttons */}
         {myMembership && (
@@ -464,13 +538,13 @@ export default function EventDetailScreen() {
               className="text-charcoal/50 text-xs mb-2"
               style={{ fontFamily: 'Inter-Medium' }}
             >
-              Your RSVP
+              {t('detail_your_rsvp')}
             </Text>
             <View className="flex-row gap-2">
               {([
-                { status: 'going' as const, label: 'Going', emoji: '✅' },
-                { status: 'maybe' as const, label: 'Maybe', emoji: '🤔' },
-                { status: 'not_going' as const, label: "Can't go", emoji: '❌' },
+                { status: 'going' as const, label: t('detail_rsvp_going'), emoji: '✅' },
+                { status: 'maybe' as const, label: t('detail_rsvp_maybe'), emoji: '🤔' },
+                { status: 'not_going' as const, label: t('detail_rsvp_not_going'), emoji: '❌' },
               ]).map(({ status, label, emoji }) => {
                 const isSelected = myRsvp === status;
                 return (
@@ -504,9 +578,9 @@ export default function EventDetailScreen() {
           <View className="px-5 pt-5 flex-row items-center justify-between">
             <View className="flex-row gap-1.5">
               {([
-                { key: 'all' as const, label: 'All' },
-                { key: 'unclaimed' as const, label: 'Unclaimed' },
-                { key: 'claimed' as const, label: 'Claimed' },
+                { key: 'all' as const, label: t('detail_filter_all') },
+                { key: 'unclaimed' as const, label: t('detail_filter_unclaimed') },
+                { key: 'claimed' as const, label: t('detail_filter_claimed') },
               ]).map(({ key, label }) => (
                 <TouchableOpacity
                   key={key}
@@ -531,7 +605,7 @@ export default function EventDetailScreen() {
             >
               <Ionicons name="clipboard-outline" size={13} color="#44446A" />
               <Text className="text-charcoal/60 text-xs" style={{ fontFamily: 'Inter-Medium' }}>
-                Copy list
+                {t('detail_copy_list')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -548,7 +622,7 @@ export default function EventDetailScreen() {
           ) : Object.keys(itemsByCategory).length === 0 ? (
             <View className="items-center py-10">
               <Text className="text-charcoal/40 text-base" style={{ fontFamily: 'Inter-Regular' }}>
-                No items yet.
+                {t('detail_no_items')}
               </Text>
             </View>
           ) : (
@@ -586,20 +660,21 @@ export default function EventDetailScreen() {
                   </TouchableOpacity>
                   {!isCollapsed && (
                     <View className="gap-2">
-                      {catItems?.map((item) => (
-                        <ItemCard
-                          key={item.id}
-                          item={item}
-                          currentUserId={user?.id}
-                          canManage={isAdminOrMod}
-                          isLoading={
-                            (claimMutation.isPending && claimMutation.variables?.itemId === item.id) ||
-                            (unclaimMutation.isPending && unclaimMutation.variables?.itemId === item.id)
-                          }
-                          onClaim={() => claimMutation.mutate({ itemId: item.id })}
-                          onUnclaim={() => unclaimMutation.mutate({ itemId: item.id })}
-                          onPress={() => setCommentItemId(item.id)}
-                        />
+                      {catItems?.map((item, index) => (
+                        <AnimatedItemRow key={item.id} index={index}>
+                          <ItemCard
+                            item={item}
+                            currentUserId={user?.id}
+                            canManage={isAdminOrMod}
+                            isLoading={
+                              (claimMutation.isPending && claimMutation.variables?.itemId === item.id) ||
+                              (unclaimMutation.isPending && unclaimMutation.variables?.itemId === item.id)
+                            }
+                            onClaim={() => claimMutation.mutate({ itemId: item.id })}
+                            onUnclaim={() => unclaimMutation.mutate({ itemId: item.id })}
+                            onPress={() => setCommentItemId(item.id)}
+                          />
+                        </AnimatedItemRow>
                       ))}
                     </View>
                   )}
@@ -609,11 +684,45 @@ export default function EventDetailScreen() {
           )}
         </View>
 
+        {/* AI Suggestions */}
+        {suggestions && suggestions.length > 0 && isAdminOrMod && (
+          <View className="px-5 pt-2 pb-4">
+            <Text className="text-charcoal/50 text-xs mb-3" style={{ fontFamily: 'Inter-Medium', letterSpacing: 0.6 }}>
+              {t('detail_ai_suggestions')}
+            </Text>
+            <View className="gap-2">
+              {suggestions.map((s) => (
+                <TouchableOpacity
+                  key={s.name}
+                  onPress={() => quickAddMutation.mutate(
+                    `${s.quantity ? `${s.quantity} ` : ''}${s.unit ? `${s.unit} of ` : ''}${s.name}`
+                  )}
+                  disabled={quickAddMutation.isPending}
+                  className="bg-white border border-charcoal/8 rounded-2xl px-4 py-3 flex-row items-center justify-between"
+                  activeOpacity={0.75}
+                >
+                  <View className="flex-1 mr-3">
+                    <Text className="text-charcoal text-sm" style={{ fontFamily: 'Inter-Medium' }}>
+                      {s.name}{s.quantity ? ` × ${s.quantity}${s.unit ? ` ${s.unit}` : ''}` : ''}
+                    </Text>
+                    <Text className="text-charcoal/40 text-xs mt-0.5" style={{ fontFamily: 'Inter-Regular' }} numberOfLines={1}>
+                      {s.reason}
+                    </Text>
+                  </View>
+                  <View className="bg-primary/10 rounded-xl px-3 py-1.5">
+                    <Text className="text-primary text-xs" style={{ fontFamily: 'Inter-SemiBold' }}>{t('detail_add_suggestion')}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Activity Feed */}
         {activity && activity.length > 0 && (
           <View className="px-5 pt-4 pb-2">
             <Text className="text-charcoal text-base mb-3" style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}>
-              Activity
+              {t('detail_activity_title')}
             </Text>
             <View className="gap-2">
               {activity.map((item) => (
@@ -649,8 +758,18 @@ export default function EventDetailScreen() {
           }}
         />
       )}
+
+      <CelebrationOverlay
+        visible={celebration.visible}
+        onDismiss={celebration.dismiss}
+      />
     </View>
   );
+}
+
+function AnimatedItemRow({ index, children }: { index: number; children: React.ReactNode }) {
+  const { animatedStyle } = useFadeInUp({ delay: index * 55 });
+  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
 function HeroBadge({ icon, label, isLight }: { icon: keyof typeof Ionicons.glyphMap; label: string; isLight?: boolean }) {
@@ -739,6 +858,7 @@ function CommentsModal({
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const queryClient = useQueryClient();
+  const { t } = useT();
 
   useEscapeKey(onClose, true);
 
@@ -788,7 +908,7 @@ function CommentsModal({
               <ActivityIndicator color="#FF6B4A" className="py-8" />
             ) : (comments ?? []).length === 0 ? (
               <Text className="text-charcoal/40 text-sm text-center py-8" style={{ fontFamily: 'Inter-Regular' }}>
-                No comments yet. Be the first!
+                {t('detail_no_comments')}
               </Text>
             ) : (
               <View className="gap-4 pb-4">
@@ -818,7 +938,7 @@ function CommentsModal({
             <TextInput
               value={text}
               onChangeText={setText}
-              placeholder="Add a comment..."
+              placeholder={t('detail_add_comment')}
               placeholderTextColor="#9999B8"
               className="flex-1 bg-white border border-charcoal/10 rounded-2xl px-4 py-3 text-charcoal text-sm"
               style={{ fontFamily: 'Inter-Regular' }}

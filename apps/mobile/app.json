@@ -71,8 +71,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "replace-with-your-eas-project-id"
-      }
-    }
+        "projectId": "f7c30ba9-7feb-4607-9a3b-4d2c039ca88c"
+      },
+      "router": {}
+    },
+    "owner": "ohadbarr"
   }
 }

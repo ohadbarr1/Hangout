@@ -2,26 +2,27 @@ import { View, Text, ScrollView, TouchableOpacity, RefreshControl, TextInput } f
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 
 import { useMyEventsWithCounts } from '@/hooks/useEvent';
 import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/Skeleton';
 import { EventStatus } from '@hangout/shared';
-
-const STATUS_TABS: Array<{ label: string; value: EventStatus | 'all' }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Active', value: EventStatus.Active },
-  { label: 'Draft', value: EventStatus.Draft },
-  { label: 'Done', value: EventStatus.Completed },
-];
-
-import { useState } from 'react';
+import { useT } from '@/i18n';
 
 export default function MyEventsScreen() {
   const insets = useSafeAreaInsets();
   const { data: events, isLoading, isRefetching, refetch } = useMyEventsWithCounts();
   const [activeTab, setActiveTab] = useState<EventStatus | 'all'>('all');
   const [search, setSearch] = useState('');
+  const { t } = useT();
+
+  const STATUS_TABS: Array<{ label: string; value: EventStatus | 'all' }> = [
+    { label: t('my_events_tab_all'), value: 'all' },
+    { label: t('my_events_tab_active'), value: EventStatus.Active },
+    { label: t('my_events_tab_draft'), value: EventStatus.Draft },
+    { label: t('my_events_tab_done'), value: EventStatus.Completed },
+  ];
 
   const filtered = (events ?? []).filter((e) => {
     if (activeTab !== 'all' && e.status !== activeTab) return false;
@@ -40,7 +41,7 @@ export default function MyEventsScreen() {
           className="text-charcoal text-2xl"
           style={{ fontFamily: 'PlusJakartaSans-Bold' }}
         >
-          My Events
+          {t('my_events_title')}
         </Text>
       </View>
 
@@ -51,7 +52,7 @@ export default function MyEventsScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search events..."
+            placeholder={t('my_events_search')}
             placeholderTextColor="#9999B8"
             className="flex-1 py-3 text-charcoal text-sm"
             style={{ fontFamily: 'Inter-Regular' }}
@@ -116,7 +117,7 @@ export default function MyEventsScreen() {
               className="text-charcoal/40 text-base mt-4 text-center"
               style={{ fontFamily: 'Inter-Regular' }}
             >
-              No {activeTab === 'all' ? '' : activeTab} events yet.
+              {t('my_events_empty')}
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/event/create')}
@@ -126,7 +127,7 @@ export default function MyEventsScreen() {
                 className="text-primary text-sm"
                 style={{ fontFamily: 'Inter-SemiBold' }}
               >
-                Create one
+                {t('home_new_event')}
               </Text>
             </TouchableOpacity>
           </View>

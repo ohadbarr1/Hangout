@@ -1,7 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import type { Item } from '@hangout/shared';
+import { useSpringPress } from '@/hooks/useSpringPress';
+import { useT } from '@/i18n';
 
 interface ItemCardProps {
   item: Item;
@@ -35,6 +38,7 @@ export const ItemCard = React.memo(function ItemCard({
   const isClaimed = item.assignment != null;
   const isClaimedByMe = item.assignment?.user_id === currentUserId;
   const claimer = item.assignment?.user;
+  const { t } = useT();
 
   return (
     <TouchableOpacity
@@ -43,7 +47,7 @@ export const ItemCard = React.memo(function ItemCard({
       disabled={!onPress}
     >
     <View
-      className={`bg-white rounded-2xl px-4 py-3.5 flex-row items-center ${
+      className={`bg-white dark:bg-charcoal-700 rounded-2xl px-4 py-3.5 flex-row items-center ${
         isClaimed ? 'opacity-80' : ''
       }`}
       style={{
@@ -67,7 +71,7 @@ export const ItemCard = React.memo(function ItemCard({
       {/* Name + meta */}
       <View className="flex-1">
         <Text
-          className={`text-base ${isClaimed ? 'text-charcoal/50 line-through' : 'text-charcoal'}`}
+          className={`text-base ${isClaimed ? 'text-charcoal/50 dark:text-white/30 line-through' : 'text-charcoal dark:text-white'}`}
           style={{ fontFamily: 'Inter-Medium' }}
           numberOfLines={1}
         >
@@ -113,7 +117,7 @@ export const ItemCard = React.memo(function ItemCard({
               className="text-mint text-xs"
               style={{ fontFamily: 'Inter-Medium' }}
             >
-              {isClaimedByMe ? 'You' : claimer.name}
+              {isClaimedByMe ? t('items_you') : claimer.name}
             </Text>
           </View>
         )}
@@ -123,11 +127,10 @@ export const ItemCard = React.memo(function ItemCard({
       {!preview && !adminMode && (
         <>
           {!isClaimed && (
-            <TouchableOpacity
+            <SpringIconButton
               onPress={onClaim}
               disabled={isLoading}
               className="bg-primary/10 rounded-xl px-3 py-2 ml-2"
-              activeOpacity={0.7}
               style={{ opacity: isLoading ? 0.6 : 1 }}
             >
               {isLoading ? (
@@ -137,17 +140,16 @@ export const ItemCard = React.memo(function ItemCard({
                   className="text-primary text-xs"
                   style={{ fontFamily: 'Inter-SemiBold' }}
                 >
-                  Claim
+                  {t('items_claim')}
                 </Text>
               )}
-            </TouchableOpacity>
+            </SpringIconButton>
           )}
           {(isClaimedByMe || (isClaimed && canManage)) && (
-            <TouchableOpacity
+            <SpringIconButton
               onPress={onUnclaim}
               disabled={isLoading}
               className="bg-charcoal/5 rounded-xl px-3 py-2 ml-2"
-              activeOpacity={0.7}
               style={{ opacity: isLoading ? 0.6 : 1 }}
             >
               {isLoading ? (
@@ -157,24 +159,58 @@ export const ItemCard = React.memo(function ItemCard({
                   className="text-charcoal/50 text-xs"
                   style={{ fontFamily: 'Inter-Medium' }}
                 >
-                  {isClaimedByMe ? 'Unclaim' : 'Remove'}
+                  {isClaimedByMe ? t('items_unclaim') : t('remove')}
                 </Text>
               )}
-            </TouchableOpacity>
+            </SpringIconButton>
           )}
         </>
       )}
 
       {adminMode && (
-        <TouchableOpacity
+        <SpringIconButton
           onPress={onDelete}
           className="w-8 h-8 rounded-full bg-red-50 items-center justify-center ml-2"
-          activeOpacity={0.7}
         >
           <Ionicons name="trash-outline" size={15} color="#EF4444" />
-        </TouchableOpacity>
+        </SpringIconButton>
       )}
     </View>
     </TouchableOpacity>
   );
 });
+
+/** Small pressable wrapper with spring scale — avoids nested Animated.View boilerplate */
+function SpringIconButton({
+  onPress,
+  disabled,
+  className,
+  style,
+  children,
+}: {
+  onPress?: () => void;
+  disabled?: boolean;
+  className?: string;
+  style?: object;
+  children: React.ReactNode;
+}) {
+  const { animatedStyle, onPressIn, onPressOut } = useSpringPress({
+    pressScale: 0.88,
+    haptic: !disabled,
+  });
+  return (
+    <Animated.View style={animatedStyle}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={disabled ? undefined : onPressIn}
+        onPressOut={disabled ? undefined : onPressOut}
+        disabled={disabled}
+        activeOpacity={1}
+        className={className}
+        style={style}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}

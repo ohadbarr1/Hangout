@@ -167,6 +167,29 @@ export const apiClient = {
   addComment: (itemId: string, text: string): Promise<ItemComment> =>
     request('POST', `/items/${itemId}/comments`, { text }),
 
+  // ─── Recap ────────────────────────────────────────────────────────────────
+
+  getRecap: (eventId: string): Promise<{
+    eventTitle: string;
+    attendeeCount: number;
+    claimedCount: number;
+    totalItems: number;
+    topContributors: string[];
+    aiOneliner: string;
+    members: Array<{ name: string; avatar_url: string | null }>;
+  }> =>
+    request('GET', `/events/${eventId}/recap`),
+
+  // ─── AI suggestions ───────────────────────────────────────────────────────
+
+  suggestItems: (eventId: string): Promise<Array<{
+    name: string; category: string; quantity: number | null; unit: string | null; reason: string;
+  }>> =>
+    request('GET', `/items/events/${eventId}/items/suggest`),
+
+  quickAddItems: (eventId: string, text: string): Promise<Item[]> =>
+    request('POST', `/items/events/${eventId}/items/quick-add`, { text }),
+
   // ─── Clone event ──────────────────────────────────────────────────────────
 
   // Clone an event (returns new event)

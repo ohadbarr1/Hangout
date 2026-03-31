@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAuth, type AuthenticatedRequest } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { Category } from '../shared-types';
+import { claudeService } from '../services/claudeService';
 
 const router = Router();
 
@@ -220,6 +221,94 @@ router.post('/:id/comments', requireAuth, validateBody(z.object({ text: z.string
 
   if (error) { res.status(500).json({ data: null, error: { message: error.message } }); return; }
   res.json({ data: comment, error: null });
+});
+
+// ─── GET /events/:eventId/items/suggest ──────────────────────────────────────
+
+router.get('/events/:eventId/items/suggest', requireAuth, async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { eventId } = req.params;
+
+  const membership = await getMembership(eventId, userId);
+  if (!membership) {
+    res.status(403).json({ data: null, error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    return;
+  }
+
+  // Fetch event title + existing item names
+  const [{ data: event }, { data: items }] = await Promise.all([
+    supabase.from('events').select('title').eq('id', eventId).single(),
+    supabase.from('items').select('name').eq('event_id', eventId),
+  ]);
+
+  if (!event) {
+    res.status(404).json({ data: null, error: { message: 'Event not found', code: 'NOT_FOUND' } });
+    return;
+  }
+
+  try {
+    const suggestions = await claudeService.suggestItems(
+      event.title,
+      (items ?? []).map((i: { name: string }) => i.name),
+    );
+    res.json({ data: suggestions, error: null });
+  } catch {
+    res.status(502).json({ data: null, error: { message: 'AI suggestion failed', code: 'AI_ERROR' } });
+  }
+});
+
+// ─── POST /events/:eventId/items/quick-add ────────────────────────────────────
+
+const quickAddSchema = z.object({
+  text: z.string().min(2).max(500),
+});
+
+router.post('/events/:eventId/items/quick-add', requireAuth, validateBody(quickAddSchema), async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { eventId } = req.params;
+  const { text } = req.body as { text: string };
+
+  const membership = await getMembership(eventId, userId);
+  if (!membership) {
+    res.status(403).json({ data: null, error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    return;
+  }
+
+  let parsed: Array<{ name: string; category: string; quantity: number | null; unit: string | null }>;
+  try {
+    parsed = await claudeService.parseQuickAdd(text);
+  } catch {
+    res.status(502).json({ data: null, error: { message: 'AI parsing failed', code: 'AI_ERROR' } });
+    return;
+  }
+
+  if (parsed.length === 0) {
+    res.status(400).json({ data: null, error: { message: 'Could not parse any items from that text', code: 'PARSE_FAILED' } });
+    return;
+  }
+
+  // Insert all parsed items
+  const toInsert = parsed.map((p) => ({
+    event_id: eventId,
+    name: p.name,
+    category: Object.values(Category).includes(p.category as Category) ? p.category : Category.Tasks,
+    quantity: p.quantity,
+    unit: p.unit,
+    is_ai_generated: true,
+    added_by: userId,
+  }));
+
+  const { data, error } = await supabase
+    .from('items')
+    .insert(toInsert)
+    .select('*, assignment:assignments(*, user:users(id, name, avatar_url))');
+
+  if (error) {
+    res.status(500).json({ data: null, error: { message: error.message } });
+    return;
+  }
+
+  res.status(201).json({ data, error: null });
 });
 
 export { router as itemsRouter };

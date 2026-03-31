@@ -7,6 +7,7 @@ import { validateBody } from '../middleware/validate';
 import type { Event, ParsedCategory } from '../shared-types';
 import { writeActivity } from '../lib/activity';
 import { logger } from '../lib/logger';
+import { claudeService } from '../services/claudeService';
 
 const router = Router();
 
@@ -478,5 +479,73 @@ function generateInviteCode(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
+
+// ─── GET /events/:id/recap ────────────────────────────────────────────────────
+
+router.get('/:id/recap', requireAuth, async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { id } = req.params;
+
+  // Must be a member
+  const { data: membership } = await supabase
+    .from('event_members')
+    .select('role')
+    .eq('event_id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!membership) {
+    res.status(403).json({ data: null, error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    return;
+  }
+
+  const [{ data: event }, { data: members }, { data: items }] = await Promise.all([
+    supabase.from('events').select('title, status').eq('id', id).single(),
+    supabase.from('event_members').select('user:users(name)').eq('event_id', id),
+    supabase.from('items').select('name, assignment:assignments(user:users(name))').eq('event_id', id),
+  ]);
+
+  if (!event) {
+    res.status(404).json({ data: null, error: { message: 'Event not found', code: 'NOT_FOUND' } });
+    return;
+  }
+
+  const totalItems = (items ?? []).length;
+  const claimedItems = (items ?? []).filter((i: any) => i.assignment != null);
+  const claimedCount = claimedItems.length;
+  const attendeeCount = (members ?? []).length;
+
+  // Top contributors — users who claimed the most items
+  const contributorCounts: Record<string, number> = {};
+  for (const item of claimedItems as any[]) {
+    const name = item.assignment?.user?.name;
+    if (name) contributorCounts[name] = (contributorCounts[name] ?? 0) + 1;
+  }
+  const topContributors = Object.entries(contributorCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name]) => name);
+
+  const aiOneliner = await claudeService.generateRecap(
+    event.title,
+    attendeeCount,
+    claimedCount,
+    totalItems,
+    topContributors,
+  ).catch(() => `${event.title} was a blast!`);
+
+  res.json({
+    data: {
+      eventTitle: event.title,
+      attendeeCount,
+      claimedCount,
+      totalItems,
+      topContributors,
+      aiOneliner,
+      members: (members ?? []).map((m: any) => m.user).filter(Boolean),
+    },
+    error: null,
+  });
+});
 
 export { router as eventsRouter };

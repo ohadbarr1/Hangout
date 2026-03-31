@@ -1,7 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
+import Animated from 'react-native-reanimated';
 import type { Event } from '@hangout/shared';
 import { formatDate } from '@/utils/dateUtils';
+import { useSpringPress } from '@/hooks/useSpringPress';
+import { useT } from '@/i18n';
 
 const HERO_COLORS: Record<string, string> = {
   coral: '#FF6B4A',
@@ -31,12 +34,17 @@ export const EventCard = React.memo(function EventCard({
 }: EventCardProps) {
   const accentColor = HERO_COLORS[event.hero_color] ?? HERO_COLORS.coral;
   const progressPercent = totalItems > 0 ? Math.round((claimedCount / totalItems) * 100) : 0;
+  const { animatedStyle, onPressIn, onPressOut } = useSpringPress({ pressScale: 0.97 });
+  const { t } = useT();
 
   return (
+    <Animated.View style={animatedStyle}>
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.88}
-      className={`bg-white rounded-3xl overflow-hidden shadow-sm shadow-charcoal/5 ${muted ? 'opacity-60' : ''}`}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      activeOpacity={1}
+      className={`bg-white dark:bg-charcoal-700 rounded-3xl overflow-hidden shadow-sm shadow-charcoal/5 ${muted ? 'opacity-60' : ''}`}
     >
       {/* Color strip */}
       <View
@@ -47,20 +55,20 @@ export const EventCard = React.memo(function EventCard({
         {/* Title + status */}
         <View className="flex-row items-start justify-between mb-2">
           <Text
-            className="text-charcoal text-base flex-1 mr-2"
+            className="text-charcoal dark:text-white text-base flex-1 mr-2"
             style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}
             numberOfLines={2}
           >
             {event.title}
           </Text>
-          <StatusBadge status={event.status} />
+          <StatusBadge status={event.status} t={t} />
         </View>
 
         {/* Date + location */}
         <View className="flex-row flex-wrap gap-3 mb-4">
           {event.event_date && (
             <Text
-              className="text-charcoal/50 text-xs"
+              className="text-charcoal/50 dark:text-white/40 text-xs"
               style={{ fontFamily: 'Inter-Regular' }}
             >
               📅 {formatDate(event.event_date)}
@@ -68,7 +76,7 @@ export const EventCard = React.memo(function EventCard({
           )}
           {event.location && (
             <Text
-              className="text-charcoal/50 text-xs"
+              className="text-charcoal/50 dark:text-white/40 text-xs"
               style={{ fontFamily: 'Inter-Regular' }}
               numberOfLines={1}
             >
@@ -83,10 +91,10 @@ export const EventCard = React.memo(function EventCard({
             <View className="flex-1 mr-4">
               <View className="flex-row justify-between mb-1.5">
                 <Text
-                  className="text-charcoal/50 text-xs"
+                  className="text-charcoal/50 dark:text-white/40 text-xs"
                   style={{ fontFamily: 'Inter-Regular' }}
                 >
-                  {claimedCount}/{totalItems} claimed
+                  {t('card_claimed', { claimed: claimedCount, total: totalItems })}
                 </Text>
                 <Text
                   className="text-xs"
@@ -116,15 +124,16 @@ export const EventCard = React.memo(function EventCard({
         </View>
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
 });
 
-function StatusBadge({ status }: { status: Event['status'] }) {
+function StatusBadge({ status, t }: { status: Event['status']; t: (k: string) => string }) {
   const config: Record<string, { label: string; bg: string; text: string }> = {
-    draft: { label: 'Draft', bg: '#F5F5F9', text: '#44446A' },
-    active: { label: 'Active', bg: '#EDFDF8', text: '#028F69' },
-    completed: { label: 'Done', bg: '#F5F5F9', text: '#9999B8' },
-    cancelled: { label: 'Cancelled', bg: '#FFF1EE', text: '#C43A1C' },
+    draft: { label: t('status_draft'), bg: '#F5F5F9', text: '#44446A' },
+    active: { label: t('status_active'), bg: '#EDFDF8', text: '#028F69' },
+    completed: { label: t('status_completed'), bg: '#F5F5F9', text: '#9999B8' },
+    cancelled: { label: t('status_cancelled'), bg: '#FFF1EE', text: '#C43A1C' },
   };
   const c = config[status] ?? config.draft;
   return (

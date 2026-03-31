@@ -10,6 +10,7 @@ import Constants from 'expo-constants';
 import '../global.css';
 
 import { useAuthStore } from '@/stores/authStore';
+import { useLanguageStore } from '@/stores/languageStore';
 import { supabase } from '@/lib/supabase';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastProviderWithRef } from '@/components/Toast';
@@ -51,7 +52,10 @@ const queryClient = new QueryClient({
 
 export default function RootLayout() {
   const { session, setSession, setUser, pendingInviteToken, setPendingInviteToken } = useAuthStore();
+  const initLang = useLanguageStore((s) => s.init);
   const [sessionChecked, setSessionChecked] = useState(false);
+
+  useEffect(() => { initLang(); }, []);
 
   const [fontsLoaded, fontError] = useFonts({
     'PlusJakartaSans-Regular': require('../assets/fonts/PlusJakartaSans-Regular.ttf'),

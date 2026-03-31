@@ -1,3 +1,4 @@
+import Animated from 'react-native-reanimated';
 import {
   TouchableOpacity,
   Text,
@@ -5,6 +6,7 @@ import {
   StyleSheet,
   type TouchableOpacityProps,
 } from 'react-native';
+import { useSpringPress } from '@/hooks/useSpringPress';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
 type Size = 'sm' | 'md' | 'lg';
@@ -28,46 +30,56 @@ export function Button({
   leftIcon,
   rightIcon,
   disabled,
+  onPress,
   ...props
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const { animatedStyle, onPressIn, onPressOut } = useSpringPress({
+    pressScale: 0.95,
+    haptic: !isDisabled,
+  });
 
   return (
-    <TouchableOpacity
-      {...props}
-      disabled={isDisabled}
-      activeOpacity={0.82}
-      style={[
-        styles.base,
-        styles[`variant_${variant}`],
-        styles[`size_${size}`],
-        fullWidth && styles.fullWidth,
-        isDisabled && styles.disabled,
-      ]}
-    >
-      {loading ? (
-        <ActivityIndicator
-          color={variant === 'outline' || variant === 'ghost' ? '#FF6B4A' : '#fff'}
-          size="small"
-        />
-      ) : (
-        <>
-          {leftIcon}
-          <Text
-            style={[
-              styles.label,
-              styles[`labelVariant_${variant}`],
-              styles[`labelSize_${size}`],
-              leftIcon != null && { marginLeft: 8 },
-              rightIcon != null && { marginRight: 8 },
-            ]}
-          >
-            {label}
-          </Text>
-          {rightIcon}
-        </>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[animatedStyle, fullWidth && styles.fullWidth]}>
+      <TouchableOpacity
+        {...props}
+        onPress={onPress}
+        onPressIn={isDisabled ? undefined : onPressIn}
+        onPressOut={isDisabled ? undefined : onPressOut}
+        disabled={isDisabled}
+        activeOpacity={1}
+        style={[
+          styles.base,
+          styles[`variant_${variant}`],
+          styles[`size_${size}`],
+          fullWidth && styles.fullWidth,
+          isDisabled && styles.disabled,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator
+            color={variant === 'outline' || variant === 'ghost' ? '#FF6B4A' : '#fff'}
+            size="small"
+          />
+        ) : (
+          <>
+            {leftIcon}
+            <Text
+              style={[
+                styles.label,
+                styles[`labelVariant_${variant}`],
+                styles[`labelSize_${size}`],
+                leftIcon != null && { marginLeft: 8 },
+                rightIcon != null && { marginRight: 8 },
+              ]}
+            >
+              {label}
+            </Text>
+            {rightIcon}
+          </>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
