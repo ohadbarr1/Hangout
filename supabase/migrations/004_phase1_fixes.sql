@@ -5,8 +5,18 @@
 -- This eliminates the SELECT → check → INSERT race window.
 -- Two concurrent INSERTs will result in exactly one succeeding;
 -- the other gets PostgreSQL error code 23505 (unique_violation) → 409 CONFLICT.
-ALTER TABLE assignments
-  ADD CONSTRAINT IF NOT EXISTS assignments_item_id_unique UNIQUE (item_id);
+-- Uses a DO block because PostgreSQL does not support IF NOT EXISTS on ADD CONSTRAINT.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'assignments_item_id_unique'
+    AND table_name = 'assignments'
+  ) THEN
+    ALTER TABLE assignments
+      ADD CONSTRAINT assignments_item_id_unique UNIQUE (item_id);
+  END IF;
+END $$;
 
 -- ─── Performance indexes ──────────────────────────────────────────────────────
 
