@@ -36,6 +36,7 @@ import { apiClient } from '@/lib/claude';
 import type { ActivityItem } from '@/lib/claude';
 import { showAlert } from '@/components/Toast';
 import { EventDetailHeroSkeleton, ItemCardSkeleton } from '@/components/Skeleton';
+import { TeamsSheet } from '@/components/TeamsSheet';
 import type { Category, EventMember } from '@hangout/shared';
 import { formatDate } from '@/utils/dateUtils';
 import { categoryEmoji } from '@/utils/categoryUtils';
@@ -84,6 +85,7 @@ export default function EventDetailScreen() {
   const [commentItemId, setCommentItemId] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [showTeams, setShowTeams] = useState(false);
   const [itemFilter, setItemFilter] = useState<'all' | 'unclaimed' | 'claimed'>('all');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
@@ -340,7 +342,7 @@ export default function EventDetailScreen() {
     <View className="flex-1 bg-warmwhite">
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FF6B4A" />
@@ -389,6 +391,13 @@ export default function EventDetailScreen() {
                   <Ionicons name="link-outline" size={20} color="#fff" />
                 </TouchableOpacity>
               )}
+              <TouchableOpacity
+                onPress={() => setShowTeams(true)}
+                accessibilityLabel="Teams"
+                className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
+              >
+                <Ionicons name="people-outline" size={20} color="#fff" />
+              </TouchableOpacity>
               {isAdminOrMod && (
                 <>
                   <TouchableOpacity
@@ -758,6 +767,15 @@ export default function EventDetailScreen() {
           }}
         />
       )}
+
+      <TeamsSheet
+        visible={showTeams}
+        onClose={() => setShowTeams(false)}
+        eventId={id!}
+        currentUserId={user?.id ?? ''}
+        isAdminOrMod={isAdminOrMod}
+        myTeamId={myMembership?.team_id}
+      />
 
       <CelebrationOverlay
         visible={celebration.visible}

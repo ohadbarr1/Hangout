@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import type { Item } from '@hangout/shared';
@@ -13,13 +13,9 @@ interface ItemCardProps {
   onUnclaim?: () => void;
   onDelete?: () => void;
   onPress?: () => void;
-  /** Preview mode — no claim/assign actions, used in create flow */
   preview?: boolean;
-  /** Admin mode — shows delete button */
   adminMode?: boolean;
-  /** Admin/mod can unclaim on behalf of others */
   canManage?: boolean;
-  /** Show loading state on claim/unclaim */
   isLoading?: boolean;
 }
 
@@ -46,158 +42,137 @@ export const ItemCard = React.memo(function ItemCard({
       activeOpacity={onPress ? 0.75 : 1}
       disabled={!onPress}
     >
-    <View
-      className={`bg-white dark:bg-charcoal-700 rounded-2xl px-4 py-3.5 flex-row items-center ${
-        isClaimed ? 'opacity-80' : ''
-      }`}
-      style={{
-        borderWidth: 1,
-        borderColor: isClaimed ? 'rgba(6, 214, 160, 0.25)' : 'rgba(26,26,46,0.06)',
-      }}
-    >
-      {/* Claimed checkmark or category indicator */}
-      <View
-        className={`w-8 h-8 rounded-xl items-center justify-center mr-3 ${
-          isClaimed ? 'bg-mint/15' : 'bg-charcoal/5'
-        }`}
-      >
-        {isClaimed ? (
-          <Ionicons name="checkmark" size={18} color="#06D6A0" />
-        ) : (
-          <Ionicons name="ellipse-outline" size={16} color="#9999B8" />
-        )}
-      </View>
-
-      {/* Name + meta */}
-      <View className="flex-1">
-        <Text
-          className={`text-base ${isClaimed ? 'text-charcoal/50 dark:text-white/30 line-through' : 'text-charcoal dark:text-white'}`}
-          style={{ fontFamily: 'Inter-Medium' }}
-          numberOfLines={1}
+      <View style={[styles.card, isClaimed && styles.cardClaimed]}>
+        {/* Checkbox */}
+        <TouchableOpacity
+          onPress={isClaimedByMe ? onUnclaim : isClaimed ? undefined : onClaim}
+          disabled={isLoading || preview || (!isClaimedByMe && isClaimed && !canManage)}
+          activeOpacity={0.7}
+          style={styles.checkTouchable}
         >
-          {item.name}
-          {item.quantity != null && (
-            <Text
-              className="text-charcoal/40 text-sm"
-              style={{ fontFamily: 'Inter-Regular' }}
-            >
-              {' '}× {item.quantity}{item.unit ? ` ${item.unit}` : ''}
-            </Text>
-          )}
-        </Text>
+          <View style={[styles.checkbox, isClaimed && styles.checkboxChecked]}>
+            {isClaimed && <Ionicons name="checkmark" size={13} color="#fff" />}
+          </View>
+        </TouchableOpacity>
 
-        {item.notes && (
+        {/* Content */}
+        <View style={styles.content}>
           <Text
-            className="text-charcoal/40 text-xs mt-0.5"
-            style={{ fontFamily: 'Inter-Regular' }}
+            style={[styles.name, isClaimed && styles.nameClaimed]}
             numberOfLines={1}
           >
-            {item.notes}
+            {item.name}
+            {item.quantity != null && (
+              <Text style={styles.quantity}>
+                {' '}× {item.quantity}{item.unit ? ` ${item.unit}` : ''}
+              </Text>
+            )}
           </Text>
+
+          {item.notes && (
+            <Text style={styles.notes} numberOfLines={1}>{item.notes}</Text>
+          )}
+
+          {isClaimed && claimer && (
+            <View style={styles.claimerRow}>
+              {claimer.avatar_url ? (
+                <Image source={{ uri: claimer.avatar_url }} style={styles.claimerAvatar} />
+              ) : (
+                <View style={styles.claimerAvatarFallback}>
+                  <Text style={styles.claimerInitial}>{claimer.name.charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
+              <Text style={styles.claimerName}>
+                {isClaimedByMe ? t('items_you') : claimer.name}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Actions */}
+        {!preview && !adminMode && (
+          <>
+            {!isClaimed && (
+              <ClaimButton onPress={onClaim} isLoading={isLoading} label={t('items_claim')} />
+            )}
+            {!isClaimedByMe && isClaimed && canManage && (
+              <UnclaimButton onPress={onUnclaim} isLoading={isLoading} label={t('remove')} />
+            )}
+            {isClaimedByMe && (
+              <UnclaimButton onPress={onUnclaim} isLoading={isLoading} label={t('items_unclaim')} />
+            )}
+          </>
         )}
 
-        {isClaimed && claimer && (
-          <View className="flex-row items-center mt-1 gap-1.5">
-            {claimer.avatar_url ? (
-              <Image
-                source={{ uri: claimer.avatar_url }}
-                className="w-4 h-4 rounded-full"
-              />
-            ) : (
-              <View className="w-4 h-4 rounded-full bg-primary/20 items-center justify-center">
-                <Text
-                  className="text-primary"
-                  style={{ fontSize: 8, fontFamily: 'PlusJakartaSans-Bold' }}
-                >
-                  {claimer.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <Text
-              className="text-mint text-xs"
-              style={{ fontFamily: 'Inter-Medium' }}
-            >
-              {isClaimedByMe ? t('items_you') : claimer.name}
-            </Text>
-          </View>
+        {adminMode && (
+          <SpringIconButton onPress={onDelete} style={styles.deleteBtn}>
+            <Ionicons name="trash-outline" size={15} color="#EF4444" />
+          </SpringIconButton>
         )}
       </View>
-
-      {/* Actions */}
-      {!preview && !adminMode && (
-        <>
-          {!isClaimed && (
-            <SpringIconButton
-              onPress={onClaim}
-              disabled={isLoading}
-              className="bg-primary/10 rounded-xl px-3 py-2 ml-2"
-              style={{ opacity: isLoading ? 0.6 : 1 }}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#FF6B4A" />
-              ) : (
-                <Text
-                  className="text-primary text-xs"
-                  style={{ fontFamily: 'Inter-SemiBold' }}
-                >
-                  {t('items_claim')}
-                </Text>
-              )}
-            </SpringIconButton>
-          )}
-          {(isClaimedByMe || (isClaimed && canManage)) && (
-            <SpringIconButton
-              onPress={onUnclaim}
-              disabled={isLoading}
-              className="bg-charcoal/5 rounded-xl px-3 py-2 ml-2"
-              style={{ opacity: isLoading ? 0.6 : 1 }}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#9999B8" />
-              ) : (
-                <Text
-                  className="text-charcoal/50 text-xs"
-                  style={{ fontFamily: 'Inter-Medium' }}
-                >
-                  {isClaimedByMe ? t('items_unclaim') : t('remove')}
-                </Text>
-              )}
-            </SpringIconButton>
-          )}
-        </>
-      )}
-
-      {adminMode && (
-        <SpringIconButton
-          onPress={onDelete}
-          className="w-8 h-8 rounded-full bg-red-50 items-center justify-center ml-2"
-        >
-          <Ionicons name="trash-outline" size={15} color="#EF4444" />
-        </SpringIconButton>
-      )}
-    </View>
     </TouchableOpacity>
   );
 });
 
-/** Small pressable wrapper with spring scale — avoids nested Animated.View boilerplate */
+function ClaimButton({ onPress, isLoading, label }: { onPress?: () => void; isLoading?: boolean; label: string }) {
+  const { animatedStyle, onPressIn, onPressOut } = useSpringPress({ pressScale: 0.9 });
+  return (
+    <Animated.View style={animatedStyle}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={isLoading}
+        activeOpacity={1}
+        style={[styles.claimBtn, isLoading && { opacity: 0.6 }]}
+      >
+        {isLoading ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <>
+            <Ionicons name="add" size={14} color="#fff" />
+            <Text style={styles.claimBtnText}>{label}</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+function UnclaimButton({ onPress, isLoading, label }: { onPress?: () => void; isLoading?: boolean; label: string }) {
+  const { animatedStyle, onPressIn, onPressOut } = useSpringPress({ pressScale: 0.9 });
+  return (
+    <Animated.View style={animatedStyle}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={isLoading}
+        activeOpacity={1}
+        style={[styles.unclaimBtn, isLoading && { opacity: 0.6 }]}
+      >
+        {isLoading ? (
+          <ActivityIndicator size="small" color="#9999B8" />
+        ) : (
+          <Text style={styles.unclaimBtnText}>{label}</Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 function SpringIconButton({
   onPress,
   disabled,
-  className,
   style,
   children,
 }: {
   onPress?: () => void;
   disabled?: boolean;
-  className?: string;
   style?: object;
   children: React.ReactNode;
 }) {
-  const { animatedStyle, onPressIn, onPressOut } = useSpringPress({
-    pressScale: 0.88,
-    haptic: !disabled,
-  });
+  const { animatedStyle, onPressIn, onPressOut } = useSpringPress({ pressScale: 0.88 });
   return (
     <Animated.View style={animatedStyle}>
       <TouchableOpacity
@@ -206,7 +181,6 @@ function SpringIconButton({
         onPressOut={disabled ? undefined : onPressOut}
         disabled={disabled}
         activeOpacity={1}
-        className={className}
         style={style}
       >
         {children}
@@ -214,3 +188,128 @@ function SpringIconButton({
     </Animated.View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(26,26,46,0.06)',
+  },
+  cardClaimed: {
+    borderColor: 'rgba(6,214,160,0.2)',
+    backgroundColor: 'rgba(6,214,160,0.03)',
+  },
+  checkTouchable: {
+    flexShrink: 0,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: 'rgba(26,26,46,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#06D6A0',
+    borderColor: '#06D6A0',
+  },
+  content: {
+    flex: 1,
+    gap: 2,
+  },
+  name: {
+    fontSize: 15,
+    fontFamily: 'Inter-Medium',
+    color: '#1A1A2E',
+    lineHeight: 20,
+  },
+  nameClaimed: {
+    color: 'rgba(26,26,46,0.35)',
+    textDecorationLine: 'line-through',
+  },
+  quantity: {
+    fontFamily: 'Inter-Regular',
+    color: 'rgba(26,26,46,0.4)',
+    fontSize: 14,
+  },
+  notes: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: 'rgba(26,26,46,0.4)',
+  },
+  claimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
+  claimerAvatar: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  claimerAvatarFallback: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: 'rgba(6,214,160,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  claimerInitial: {
+    fontSize: 7,
+    fontFamily: 'PlusJakartaSans-Bold',
+    color: '#06D6A0',
+  },
+  claimerName: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+    color: '#06D6A0',
+  },
+  claimBtn: {
+    backgroundColor: '#FF6B4A',
+    borderRadius: 11,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
+  claimBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+  },
+  unclaimBtn: {
+    backgroundColor: 'rgba(26,26,46,0.06)',
+    borderRadius: 11,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unclaimBtnText: {
+    color: 'rgba(26,26,46,0.45)',
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+  },
+  deleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#FFF1F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+});

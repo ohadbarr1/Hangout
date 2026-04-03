@@ -94,8 +94,21 @@ export interface EventMember {
   role: MemberRole;
   rsvp_status: RsvpStatus;
   joined_at: string;
+  team_id?: string | null;
   // Joined
   user?: Pick<User, 'id' | 'name' | 'avatar_url'>;
+}
+
+export interface EventTeam {
+  id: string;
+  event_id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  created_at: string;
+  // Computed on server
+  members: Array<Pick<User, 'id' | 'name' | 'avatar_url'> & { claimed: number }>;
+  claimedCount: number;
 }
 
 export interface Invite {

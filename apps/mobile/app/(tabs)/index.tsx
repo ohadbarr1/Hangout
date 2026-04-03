@@ -38,6 +38,10 @@ const HERO_GRADIENTS: Record<string, [string, string]> = {
   charcoal: ['#2E2E50', '#44446A'],
 };
 
+const HERO_COLORS: Record<string, string> = {
+  coral: '#FF6B4A', violet: '#7B61FF', mint: '#06D6A0', golden: '#FFD166', charcoal: '#2E2E50',
+};
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -212,14 +216,16 @@ function HeroCard({ event, onPress }: { event: EventWithCounts; onPress: () => v
           </Text>
 
           {event.event_date && (
-            <Text style={styles.heroDate}>
-              📅 {formatDate(event.event_date)}
-            </Text>
+            <View style={styles.heroMetaRow}>
+              <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.75)" />
+              <Text style={styles.heroDate}>{formatDate(event.event_date)}</Text>
+            </View>
           )}
           {event.location && (
-            <Text style={styles.heroLocation} numberOfLines={1}>
-              📍 {event.location}
-            </Text>
+            <View style={styles.heroMetaRow}>
+              <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.75)" />
+              <Text style={styles.heroLocation} numberOfLines={1}>{event.location}</Text>
+            </View>
           )}
 
           {/* Progress */}
@@ -251,9 +257,8 @@ function HeroCard({ event, onPress }: { event: EventWithCounts; onPress: () => v
 function GridCard({ event, onPress }: { event: EventWithCounts; onPress: () => void }) {
   const { animatedStyle, onPressIn, onPressOut } = useSpringPress({ pressScale: 0.94 });
   const { t } = useT();
-  const gradient = HERO_GRADIENTS[event.hero_color] ?? HERO_GRADIENTS.coral;
-  const progressPercent =
-    event.totalItems > 0 ? Math.round((event.claimedCount / event.totalItems) * 100) : 0;
+  const accent = HERO_COLORS[event.hero_color] ?? HERO_COLORS.coral;
+  const isActive = event.status === 'active';
 
   return (
     <Animated.View style={[animatedStyle, { width: GRID_CARD_W }]}>
@@ -264,50 +269,32 @@ function GridCard({ event, onPress }: { event: EventWithCounts; onPress: () => v
         activeOpacity={1}
         style={styles.gridCard}
       >
-        {/* Top color strip */}
-        <LinearGradient
-          colors={gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.gridStrip}
-        />
+        {/* Left accent */}
+        <View style={[styles.gridAccent, { backgroundColor: accent }]} />
 
         <View style={styles.gridBody}>
-          {/* Status dot */}
+          {/* Status */}
           <View style={styles.gridStatusRow}>
-            <View
-              style={[
-                styles.gridDot,
-                { backgroundColor: event.status === 'active' ? '#06D6A0' : '#9999B8' },
-              ]}
-            />
+            <View style={[styles.gridDot, { backgroundColor: isActive ? '#06D6A0' : 'rgba(26,26,46,0.18)' }]} />
             <Text style={styles.gridStatus}>
               {event.status === 'active' ? t('status_active') : event.status === 'draft' ? t('status_draft') : event.status === 'completed' ? t('status_completed') : t('status_cancelled')}
             </Text>
           </View>
 
-          <Text style={styles.gridTitle} numberOfLines={2}>
-            {event.title}
-          </Text>
+          <Text style={styles.gridTitle} numberOfLines={2}>{event.title}</Text>
 
           {event.event_date && (
-            <Text style={styles.gridDate} numberOfLines={1}>
-              {formatDate(event.event_date)}
-            </Text>
+            <View style={styles.gridDateRow}>
+              <Ionicons name="calendar-outline" size={10} color="#C8C8D8" />
+              <Text style={styles.gridDate}>{formatDate(event.event_date)}</Text>
+            </View>
           )}
 
-          {/* Mini progress bar */}
           {event.totalItems > 0 && (
-            <View style={styles.gridProgressWrapper}>
-              <View style={styles.gridProgressTrack}>
-                <LinearGradient
-                  colors={gradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.gridProgressFill, { width: `${progressPercent}%` }]}
-                />
-              </View>
-              <Text style={styles.gridProgressText}>{progressPercent}%</Text>
+            <View style={[styles.gridFraction, { backgroundColor: accent + '18' }]}>
+              <Text style={[styles.gridFractionText, { color: accent }]}>
+                {event.claimedCount}/{event.totalItems}
+              </Text>
             </View>
           )}
         </View>
@@ -405,7 +392,7 @@ function getGreeting(): string {
 const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 120,
     paddingTop: 8,
   },
   bento: {
@@ -440,20 +427,27 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     lineHeight: 32,
   },
+  heroMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 3,
+  },
   heroDate: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
     fontFamily: 'Inter-Regular',
-    marginBottom: 3,
   },
   heroLocation: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 12,
     fontFamily: 'Inter-Regular',
-    marginBottom: 18,
+    flex: 1,
+    marginBottom: 0,
   },
   heroProgressRow: {
     gap: 8,
+    marginTop: 14,
   },
   heroProgressBar: {
     height: 5,
@@ -483,23 +477,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#1A1A2E',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.07,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 10,
+    elevation: 3,
   },
-  gridStrip: {
-    height: 5,
+  gridAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
   },
   gridBody: {
     padding: 14,
-    gap: 4,
+    paddingLeft: 17,
+    gap: 5,
   },
   gridStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginBottom: 2,
   },
   gridDot: {
     width: 6,
@@ -507,9 +505,11 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   gridStatus: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'Inter-Medium',
-    color: '#9999B8',
+    color: '#B0B0C8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   gridTitle: {
     fontSize: 14,
@@ -517,30 +517,26 @@ const styles = StyleSheet.create({
     color: '#1A1A2E',
     lineHeight: 19,
   },
+  gridDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   gridDate: {
     fontSize: 11,
     fontFamily: 'Inter-Regular',
-    color: '#9999B8',
-    marginTop: 2,
+    color: '#B0B0C8',
   },
-  gridProgressWrapper: {
-    marginTop: 10,
-    gap: 4,
+  gridFraction: {
+    alignSelf: 'flex-start',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 4,
   },
-  gridProgressTrack: {
-    height: 3,
-    backgroundColor: 'rgba(26,26,46,0.08)',
-    borderRadius: 100,
-    overflow: 'hidden',
-  },
-  gridProgressFill: {
-    height: '100%',
-    borderRadius: 100,
-  },
-  gridProgressText: {
-    fontSize: 10,
-    fontFamily: 'Inter-Medium',
-    color: '#9999B8',
+  gridFractionText: {
+    fontSize: 11,
+    fontFamily: 'Inter-SemiBold',
   },
 
   // New Event Button

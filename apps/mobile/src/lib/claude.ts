@@ -201,4 +201,18 @@ export const apiClient = {
   // Update member role (promote to co-host or demote)
   updateMemberRole: (eventId: string, memberId: string, role: 'admin' | 'guest'): Promise<EventMember> =>
     request('PATCH', `/events/${eventId}/members/${memberId}`, { role }),
+
+  // ─── Teams ────────────────────────────────────────────────────────────────
+
+  getTeams: (eventId: string): Promise<import('@hangout/shared').EventTeam[]> =>
+    request('GET', `/events/${eventId}/teams`),
+
+  createTeam: (eventId: string, data: { name: string; emoji: string; color: string }): Promise<import('@hangout/shared').EventTeam> =>
+    request('POST', `/events/${eventId}/teams`, data),
+
+  deleteTeam: (eventId: string, teamId: string): Promise<{ deleted: boolean }> =>
+    request('DELETE', `/events/${eventId}/teams/${teamId}`),
+
+  assignTeam: (eventId: string, userId: string, teamId: string | null): Promise<{ assigned: boolean }> =>
+    request('PATCH', `/events/${eventId}/teams/assign`, { userId, teamId }),
 };

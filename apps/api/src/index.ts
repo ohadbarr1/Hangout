@@ -30,6 +30,7 @@ import { assignmentsRouter } from './routes/assignments';
 import { invitesRouter } from './routes/invites';
 import { parseRouter } from './routes/parse';
 import { usersRouter } from './routes/users';
+import { teamsRouter } from './routes/teams';
 import type { AuthenticatedRequest } from './middleware/auth';
 
 // Re-export logger so other modules that import from 'index' still work
@@ -144,6 +145,7 @@ app.get('/health', async (_req, res) => {
 
 app.use('/events', parseRouter);
 app.use('/events', eventsRouter);
+app.use('/events', teamsRouter);
 app.use('/items', itemsRouter);
 app.use('/items', assignmentsRouter);
 app.use('/', invitesRouter);

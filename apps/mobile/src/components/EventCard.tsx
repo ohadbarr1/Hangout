@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import type { Event } from '@hangout/shared';
 import { formatDate } from '@/utils/dateUtils';
 import { useSpringPress } from '@/hooks/useSpringPress';
@@ -18,7 +19,6 @@ interface EventCardProps {
   event: Event;
   onPress: () => void;
   muted?: boolean;
-  // Optional progress data (pre-fetched or passed from parent)
   claimedCount?: number;
   totalItems?: number;
   attendeeAvatars?: Array<{ id: string; name: string; avatar_url: string | null }>;
@@ -32,121 +32,87 @@ export const EventCard = React.memo(function EventCard({
   totalItems = 0,
   attendeeAvatars = [],
 }: EventCardProps) {
-  const accentColor = HERO_COLORS[event.hero_color] ?? HERO_COLORS.coral;
+  const accent = HERO_COLORS[event.hero_color] ?? HERO_COLORS.coral;
   const progressPercent = totalItems > 0 ? Math.round((claimedCount / totalItems) * 100) : 0;
   const { animatedStyle, onPressIn, onPressOut } = useSpringPress({ pressScale: 0.97 });
   const { t } = useT();
 
   return (
-    <Animated.View style={animatedStyle}>
-    <TouchableOpacity
-      onPress={onPress}
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
-      activeOpacity={1}
-      className={`bg-white dark:bg-charcoal-700 rounded-3xl overflow-hidden shadow-sm shadow-charcoal/5 ${muted ? 'opacity-60' : ''}`}
-    >
-      {/* Color strip */}
-      <View
-        style={{ backgroundColor: accentColor, height: 6 }}
-      />
+    <Animated.View style={[animatedStyle, muted && { opacity: 0.55 }]}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={1}
+        style={styles.card}
+      >
+        {/* Left accent bar */}
+        <View style={[styles.accent, { backgroundColor: accent }]} />
 
-      <View className="p-4">
-        {/* Title + status */}
-        <View className="flex-row items-start justify-between mb-2">
-          <Text
-            className="text-charcoal dark:text-white text-base flex-1 mr-2"
-            style={{ fontFamily: 'PlusJakartaSans-SemiBold' }}
-            numberOfLines={2}
-          >
-            {event.title}
-          </Text>
-          <StatusBadge status={event.status} t={t} />
-        </View>
+        <View style={styles.body}>
+          {/* Title + status badge */}
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={2}>{event.title}</Text>
+            <StatusBadge status={event.status} t={t} />
+          </View>
 
-        {/* Date + location */}
-        <View className="flex-row flex-wrap gap-3 mb-4">
-          {event.event_date && (
-            <Text
-              className="text-charcoal/50 dark:text-white/40 text-xs"
-              style={{ fontFamily: 'Inter-Regular' }}
-            >
-              📅 {formatDate(event.event_date)}
-            </Text>
-          )}
-          {event.location && (
-            <Text
-              className="text-charcoal/50 dark:text-white/40 text-xs"
-              style={{ fontFamily: 'Inter-Regular' }}
-              numberOfLines={1}
-            >
-              📍 {event.location}
-            </Text>
-          )}
-        </View>
-
-        {/* Progress + avatars */}
-        <View className="flex-row items-center justify-between">
-          {totalItems > 0 ? (
-            <View className="flex-1 mr-4">
-              <View className="flex-row justify-between mb-1.5">
-                <Text
-                  className="text-charcoal/50 dark:text-white/40 text-xs"
-                  style={{ fontFamily: 'Inter-Regular' }}
-                >
-                  {t('card_claimed', { claimed: claimedCount, total: totalItems })}
-                </Text>
-                <Text
-                  className="text-xs"
-                  style={{ fontFamily: 'Inter-Medium', color: accentColor }}
-                >
-                  {progressPercent}%
-                </Text>
-              </View>
-              {/* Progress bar */}
-              <View className="h-1.5 bg-charcoal/8 rounded-full overflow-hidden">
-                <View
-                  className="h-full rounded-full"
-                  style={{
-                    backgroundColor: accentColor,
-                    width: `${progressPercent}%`,
-                  }}
-                />
-              </View>
+          {/* Date + location */}
+          {(event.event_date || event.location) && (
+            <View style={styles.metaRow}>
+              {event.event_date && (
+                <View style={styles.metaItem}>
+                  <Ionicons name="calendar-outline" size={12} color="#B8B8D0" />
+                  <Text style={styles.metaText}>{formatDate(event.event_date)}</Text>
+                </View>
+              )}
+              {event.location && (
+                <View style={styles.metaItem}>
+                  <Ionicons name="location-outline" size={12} color="#B8B8D0" />
+                  <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
+                </View>
+              )}
             </View>
-          ) : (
-            <View className="flex-1" />
           )}
 
-          {attendeeAvatars.length > 0 && (
-            <MiniAvatarGroup users={attendeeAvatars} />
-          )}
+          {/* Progress + avatars */}
+          <View style={styles.footer}>
+            {totalItems > 0 ? (
+              <View style={styles.progressWrapper}>
+                <View style={styles.progressMeta}>
+                  <Text style={styles.progressLabel}>
+                    {t('card_claimed', { claimed: claimedCount, total: totalItems })}
+                  </Text>
+                  <Text style={[styles.progressPct, { color: accent }]}>{progressPercent}%</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${progressPercent}%` as any, backgroundColor: accent }]} />
+                </View>
+              </View>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
+
+            {attendeeAvatars.length > 0 && (
+              <MiniAvatarGroup users={attendeeAvatars} />
+            )}
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
     </Animated.View>
   );
 });
 
-function StatusBadge({ status, t }: { status: Event['status']; t: (k: string) => string }) {
+function StatusBadge({ status, t }: { status: Event['status']; t: (k: any, vars?: any) => string }) {
   const config: Record<string, { label: string; bg: string; text: string }> = {
-    draft: { label: t('status_draft'), bg: '#F5F5F9', text: '#44446A' },
-    active: { label: t('status_active'), bg: '#EDFDF8', text: '#028F69' },
-    completed: { label: t('status_completed'), bg: '#F5F5F9', text: '#9999B8' },
+    draft:     { label: t('status_draft'),     bg: '#F2F2F8', text: '#6E6E9A' },
+    active:    { label: t('status_active'),    bg: '#EDFAF4', text: '#028F69' },
+    completed: { label: t('status_completed'), bg: '#F2F2F8', text: '#9999B8' },
     cancelled: { label: t('status_cancelled'), bg: '#FFF1EE', text: '#C43A1C' },
   };
   const c = config[status] ?? config.draft;
   return (
-    <View
-      className="rounded-full px-2.5 py-1"
-      style={{ backgroundColor: c.bg }}
-    >
-      <Text
-        className="text-xs"
-        style={{ fontFamily: 'Inter-Medium', color: c.text }}
-      >
-        {c.label}
-      </Text>
+    <View style={[styles.badge, { backgroundColor: c.bg }]}>
+      <Text style={[styles.badgeText, { color: c.text }]}>{c.label}</Text>
     </View>
   );
 }
@@ -160,34 +126,141 @@ function MiniAvatarGroup({
   const overflow = users.length - visible.length;
 
   return (
-    <View className="flex-row">
+    <View style={styles.avatars}>
       {visible.map((u, i) => (
         <View
           key={u.id}
-          className="w-7 h-7 rounded-full bg-primary/15 items-center justify-center border-2 border-white"
-          style={{ marginLeft: i > 0 ? -8 : 0 }}
+          style={[styles.avatar, { marginLeft: i > 0 ? -8 : 0 }]}
         >
-          <Text
-            className="text-primary text-xs"
-            style={{ fontFamily: 'PlusJakartaSans-Bold' }}
-          >
-            {u.name.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={styles.avatarInitial}>{u.name.charAt(0).toUpperCase()}</Text>
         </View>
       ))}
       {overflow > 0 && (
-        <View
-          className="w-7 h-7 rounded-full bg-charcoal/10 items-center justify-center border-2 border-white"
-          style={{ marginLeft: -8 }}
-        >
-          <Text
-            className="text-charcoal/60 text-xs"
-            style={{ fontFamily: 'Inter-Medium' }}
-          >
-            +{overflow}
-          </Text>
+        <View style={[styles.avatar, styles.avatarOverflow, { marginLeft: -8 }]}>
+          <Text style={styles.avatarOverflowText}>+{overflow}</Text>
         </View>
       )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    shadowColor: '#1A1A2E',
+    shadowOpacity: 0.07,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  accent: {
+    width: 4,
+    flexShrink: 0,
+  },
+  body: {
+    flex: 1,
+    padding: 16,
+    gap: 8,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  title: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'PlusJakartaSans-SemiBold',
+    color: '#1A1A2E',
+    lineHeight: 22,
+  },
+  badge: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    flexShrink: 0,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#B8B8D0',
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 4,
+  },
+  progressWrapper: {
+    flex: 1,
+    gap: 5,
+  },
+  progressMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: '#B8B8D0',
+  },
+  progressPct: {
+    fontSize: 11,
+    fontFamily: 'Inter-SemiBold',
+  },
+  progressTrack: {
+    height: 3,
+    backgroundColor: 'rgba(26,26,46,0.07)',
+    borderRadius: 100,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 100,
+  },
+  avatars: {
+    flexDirection: 'row',
+    flexShrink: 0,
+  },
+  avatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,107,74,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  avatarInitial: {
+    fontSize: 10,
+    fontFamily: 'PlusJakartaSans-Bold',
+    color: '#FF6B4A',
+  },
+  avatarOverflow: {
+    backgroundColor: 'rgba(26,26,46,0.08)',
+  },
+  avatarOverflowText: {
+    fontSize: 9,
+    fontFamily: 'Inter-Medium',
+    color: '#9999B8',
+  },
+});
