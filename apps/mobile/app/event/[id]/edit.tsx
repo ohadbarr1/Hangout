@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { DatePickerSheet } from '@/components/DatePickerSheet';
+import { formatDate } from '@/utils/dateUtils';
 
 import { useEvent } from '@/hooks/useEvent';
 import { useAuthStore } from '@/stores/authStore';
@@ -38,6 +40,7 @@ export default function EditEventScreen() {
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [heroColor, setHeroColor] = useState('coral');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Pre-populate form when event data loads
   useEffect(() => {
@@ -175,7 +178,14 @@ export default function EditEventScreen() {
   }
 
   return (
-    <View className="flex-1 bg-warmwhite">
+    <View className="flex-1 bg-warmwhite" style={{ position: 'relative' }}>
+      <DatePickerSheet
+        visible={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        value={eventDate}
+        onChange={setEventDate}
+        title="Event date"
+      />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -215,17 +225,28 @@ export default function EditEventScreen() {
 
           {/* Date */}
           <Text className="text-charcoal text-sm mb-1.5" style={{ fontFamily: 'Inter-SemiBold' }}>
-            Date (ISO format)
+            Date
           </Text>
-          <TextInput
-            className="bg-white rounded-xl px-4 py-3 text-charcoal text-base mb-4"
-            style={{ fontFamily: 'Inter-Regular' }}
-            value={eventDate}
-            onChangeText={setEventDate}
-            placeholder="2026-04-15"
-            placeholderTextColor="#999"
-            autoCapitalize="none"
-          />
+          <TouchableOpacity
+            onPress={() => setShowDatePicker(true)}
+            className="bg-white rounded-xl px-4 py-3 mb-4 flex-row items-center justify-between"
+            activeOpacity={0.75}
+            style={{ borderWidth: 1, borderColor: 'rgba(26,26,46,0.06)' }}
+          >
+            <Text
+              style={{ fontFamily: 'Inter-Regular', fontSize: 16, color: eventDate ? '#1A1A2E' : '#9999B8' }}
+            >
+              {eventDate ? formatDate(eventDate) : 'Pick a date'}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {eventDate ? (
+                <TouchableOpacity onPress={() => setEventDate('')} hitSlop={8}>
+                  <Ionicons name="close-circle" size={16} color="#C8C8D8" />
+                </TouchableOpacity>
+              ) : null}
+              <Ionicons name="calendar-outline" size={18} color="#FF6B4A" />
+            </View>
+          </TouchableOpacity>
 
           {/* Location */}
           <Text className="text-charcoal text-sm mb-1.5" style={{ fontFamily: 'Inter-SemiBold' }}>

@@ -2,18 +2,19 @@ import { View, Text, ScrollView, TouchableOpacity, RefreshControl, TextInput, St
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState } from 'react'; // still needed for search state
 
 import { useMyEventsWithCounts } from '@/hooks/useEvent';
 import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/Skeleton';
 import { EventStatus } from '@hangout/shared';
 import { useT } from '@/i18n';
+import { useUIStore } from '@/stores/uiStore';
 
 export default function MyEventsScreen() {
   const insets = useSafeAreaInsets();
   const { data: events, isLoading, isRefetching, refetch } = useMyEventsWithCounts();
-  const [activeTab, setActiveTab] = useState<EventStatus | 'all'>('all');
+  const { myEventsTab: activeTab, setMyEventsTab: setActiveTab } = useUIStore();
   const [search, setSearch] = useState('');
   const { t } = useT();
 

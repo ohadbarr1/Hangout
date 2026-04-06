@@ -143,6 +143,23 @@ const he = {
   detail_no_comments: 'אין תגובות עדיין. היה/י הראשון/ה!',
   detail_add_comment: 'הוסף תגובה…',
 
+  // ─── Create event ────────────────────────────────────────────────────────
+  create_title_input: 'מה התוכנית?',
+  create_title_review: 'התוכנית שלך',
+  create_placeholder: 'למשל: מנגל לים ל-20 איש בשבת אחה"צ…',
+  create_try_example: 'נסה דוגמה',
+  create_generate_btn: 'צור תוכנית עם AI',
+  create_regenerate: 'צור מחדש',
+  create_edit: 'ערוך',
+  create_confirm_btn: 'צור אירוע והזמן חברים',
+  create_loading_title: 'מתכנן את האירוע שלך…',
+  create_loading_1: 'קורא את פרטי האירוע…',
+  create_loading_2: 'מגלה מה להביא…',
+  create_loading_3: 'בונה את רשימת הפריטים…',
+  create_loading_4: 'כמעט מוכן…',
+  create_guests: '~{{count}} אורחים',
+  create_items_count: '{{count}} פריטים',
+
   // ─── Language names ───────────────────────────────────────────────────────
   lang_en: 'English',
   lang_he: 'עברית',

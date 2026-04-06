@@ -20,6 +20,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/claude';
 import { showAlert } from '@/components/Toast';
 import { ItemCard } from '@/components/ItemCard';
+import { useT } from '@/i18n';
 import type { ParsedEventResponse, ParsedCategory } from '@hangout/shared';
 
 type Step = 'input' | 'loading' | 'review';
@@ -29,6 +30,7 @@ export default function CreateEventScreen() {
   const queryClient = useQueryClient();
   const inputRef = useRef<TextInput>(null);
   const { prefill } = useLocalSearchParams<{ prefill?: string }>();
+  const { t } = useT();
 
   const [step, setStep] = useState<Step>('input');
   const [description, setDescription] = useState(prefill ?? '');
@@ -106,7 +108,7 @@ export default function CreateEventScreen() {
           className="text-charcoal text-xl flex-1"
           style={{ fontFamily: 'PlusJakartaSans-Bold' }}
         >
-          {step === 'review' ? 'Your plan' : 'What\'s the plan?'}
+          {step === 'review' ? t('create_title_review') : t('create_title_input')}
         </Text>
         {step === 'review' && (
           <View className="flex-row gap-4">
@@ -118,7 +120,7 @@ export default function CreateEventScreen() {
                 className="text-charcoal/50 text-sm"
                 style={{ fontFamily: 'Inter-Medium' }}
               >
-                Regenerate
+                {t('create_regenerate')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -128,7 +130,7 @@ export default function CreateEventScreen() {
                 className="text-primary text-sm"
                 style={{ fontFamily: 'Inter-Medium' }}
               >
-                Edit
+                {t('create_edit')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -169,7 +171,7 @@ export default function CreateEventScreen() {
             className="text-charcoal/50 text-sm mb-3"
             style={{ fontFamily: 'Inter-Medium' }}
           >
-            Try an example
+            {t('create_try_example')}
           </Text>
           <View className="gap-2 mb-8">
             {examplePrompts.map((p) => (
@@ -204,7 +206,7 @@ export default function CreateEventScreen() {
               className={`text-base ${description.trim() ? 'text-white' : 'text-charcoal/40'}`}
               style={{ fontFamily: 'Inter-SemiBold' }}
             >
-              Generate plan with AI
+              {t('create_generate_btn')}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -224,6 +226,7 @@ export default function CreateEventScreen() {
           parsedEvent={parsedEvent}
           onConfirm={handleCreate}
           isCreating={createMutation.isPending}
+          t={t}
           insets={{ bottom: insets.bottom }}
         />
       )}
@@ -231,14 +234,14 @@ export default function CreateEventScreen() {
   );
 }
 
-const LOADING_MESSAGES = [
-  'Reading your event details...',
-  'Figuring out what to bring...',
-  'Building your item list...',
-  'Almost ready...',
-];
-
 function LoadingState({ onCancel }: { onCancel: () => void }) {
+  const { t } = useT();
+  const LOADING_MESSAGES = [
+    t('create_loading_1'),
+    t('create_loading_2'),
+    t('create_loading_3'),
+    t('create_loading_4'),
+  ];
   const [messageIndex, setMessageIndex] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
 
@@ -273,7 +276,7 @@ function LoadingState({ onCancel }: { onCancel: () => void }) {
         className="text-charcoal text-xl text-center mb-4"
         style={{ fontFamily: 'PlusJakartaSans-Bold' }}
       >
-        Planning your event...
+        {t('create_loading_title')}
       </Text>
       <Animated.Text
         className="text-charcoal/50 text-base text-center leading-6"
@@ -309,11 +312,13 @@ function ReviewStep({
   parsedEvent,
   onConfirm,
   isCreating,
+  t,
   insets,
 }: {
   parsedEvent: ParsedEventResponse;
   onConfirm: () => void;
   isCreating: boolean;
+  t: (k: any, vars?: any) => string;
   insets: { bottom: number };
 }) {
   const totalItems = parsedEvent.categories.reduce(
@@ -341,9 +346,9 @@ function ReviewStep({
               <MetaBadge icon="calendar-outline" label={parsedEvent.suggestedDate} />
             )}
             {parsedEvent.estimatedGuests != null && (
-              <MetaBadge icon="people-outline" label={`~${parsedEvent.estimatedGuests} guests`} />
+              <MetaBadge icon="people-outline" label={t('create_guests', { count: parsedEvent.estimatedGuests })} />
             )}
-            <MetaBadge icon="list-outline" label={`${totalItems} items`} />
+            <MetaBadge icon="list-outline" label={t('create_items_count', { count: totalItems })} />
           </View>
         </View>
 
@@ -371,7 +376,7 @@ function ReviewStep({
               className="text-white text-base"
               style={{ fontFamily: 'Inter-SemiBold' }}
             >
-              Create event & invite friends
+              {t('create_confirm_btn')}
             </Text>
           )}
         </TouchableOpacity>

@@ -143,6 +143,23 @@ const en = {
   detail_no_comments: 'No comments yet. Be the first!',
   detail_add_comment: 'Add a comment…',
 
+  // ─── Create event ────────────────────────────────────────────────────────
+  create_title_input: "What's the plan?",
+  create_title_review: 'Your plan',
+  create_placeholder: 'e.g. Beach BBQ for 20 people next Saturday afternoon…',
+  create_try_example: 'TRY AN EXAMPLE',
+  create_generate_btn: 'Generate plan with AI',
+  create_regenerate: 'Regenerate',
+  create_edit: 'Edit',
+  create_confirm_btn: 'Create event & invite friends',
+  create_loading_title: 'Planning your event…',
+  create_loading_1: 'Reading your event details…',
+  create_loading_2: 'Figuring out what to bring…',
+  create_loading_3: 'Building your item list…',
+  create_loading_4: 'Almost ready…',
+  create_guests: '~{{count}} guests',
+  create_items_count: '{{count}} items',
+
   // ─── Language names ───────────────────────────────────────────────────────
   lang_en: 'English',
   lang_he: 'עברית',

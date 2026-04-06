@@ -540,39 +540,46 @@ export default function EventDetailScreen() {
           </TouchableOpacity>
         )}
 
-        {/* RSVP buttons */}
+        {/* RSVP */}
         {myMembership && (
-          <View className="px-5 pt-5">
-            <Text
-              className="text-charcoal/50 text-xs mb-2"
-              style={{ fontFamily: 'Inter-Medium' }}
-            >
-              {t('detail_your_rsvp')}
+          <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+            <Text style={{ fontFamily: 'Inter-Medium', fontSize: 11, color: '#B8B8D0', letterSpacing: 0.6, marginBottom: 10 }}>
+              {t('detail_your_rsvp').toUpperCase()}
             </Text>
-            <View className="flex-row gap-2">
+            <View style={{ flexDirection: 'row', gap: 8 }}>
               {([
-                { status: 'going' as const, label: t('detail_rsvp_going'), emoji: '✅' },
-                { status: 'maybe' as const, label: t('detail_rsvp_maybe'), emoji: '🤔' },
-                { status: 'not_going' as const, label: t('detail_rsvp_not_going'), emoji: '❌' },
-              ]).map(({ status, label, emoji }) => {
+                { status: 'going' as const,     label: t('detail_rsvp_going'),     icon: 'checkmark-circle' as const,  color: '#059669', bg: '#ECFDF5', activeBg: '#059669' },
+                { status: 'maybe' as const,     label: t('detail_rsvp_maybe'),     icon: 'help-circle' as const,       color: '#D97706', bg: '#FFFBEB', activeBg: '#D97706' },
+                { status: 'not_going' as const, label: t('detail_rsvp_not_going'), icon: 'close-circle' as const,      color: '#DC2626', bg: '#FEF2F2', activeBg: '#DC2626' },
+              ]).map(({ status, label, icon, color, bg, activeBg }) => {
                 const isSelected = myRsvp === status;
                 return (
                   <TouchableOpacity
                     key={status}
                     onPress={() => !isAdmin && rsvpMutation.mutate(status)}
                     disabled={isAdmin || rsvpMutation.isPending}
-                    className={`flex-1 flex-row items-center justify-center rounded-2xl py-2.5 gap-1.5 border ${
-                      isSelected
-                        ? 'bg-primary border-primary'
-                        : 'bg-white border-charcoal/10'
-                    }`}
                     activeOpacity={isAdmin ? 1 : 0.75}
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 5,
+                      paddingVertical: 11,
+                      borderRadius: 14,
+                      backgroundColor: isSelected ? activeBg : bg,
+                    }}
                   >
-                    <Text style={{ fontSize: 13 }}>{emoji}</Text>
-                    <Text
-                      className={`text-xs ${isSelected ? 'text-white' : 'text-charcoal/70'}`}
-                      style={{ fontFamily: 'Inter-Medium' }}
-                    >
+                    <Ionicons
+                      name={icon}
+                      size={15}
+                      color={isSelected ? '#fff' : color}
+                    />
+                    <Text style={{
+                      fontFamily: 'Inter-SemiBold',
+                      fontSize: 12,
+                      color: isSelected ? '#fff' : color,
+                    }}>
                       {label}
                     </Text>
                   </TouchableOpacity>
